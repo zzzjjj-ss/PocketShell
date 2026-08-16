@@ -64,7 +64,7 @@ def _content_chunk(text, finish="stop"):
 
 @pytest.fixture()
 def tmp_session(tmp_path, monkeypatch):
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path))
     return Session("loop")
 
 
@@ -90,7 +90,7 @@ def test_tool_loop_end_to_end(tmp_session, monkeypatch):
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
 
     # 需要一个假 API key
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     tmp_session.add_user("查看当前目录")
 
@@ -128,7 +128,7 @@ def test_tool_loop_blocks_destructive(tmp_session, monkeypatch):
     fake_post.called = False
     monkeypatch.setattr(api, "_post", fake_post)
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     result = api.run_conversation(
         tmp_session,
@@ -150,7 +150,7 @@ def test_stream_closed_raises(monkeypatch):
 
     monkeypatch.setattr(api, "_post", fake_post)
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     with pytest.raises(api.StreamClosed):
         api.stream_completion(
@@ -168,7 +168,7 @@ def test_401_raises_api_error(monkeypatch):
 
     monkeypatch.setattr(api, "_post", fake_post)
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     with pytest.raises(api.ApiError) as exc:
         api.stream_completion(
@@ -193,7 +193,7 @@ def test_reasoning_content_not_in_history(tmp_session, monkeypatch):
 
     monkeypatch.setattr(api, "_post", fake_post)
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     tmp_session.add_user("问题")
     result = api.run_conversation(
@@ -219,7 +219,7 @@ def test_max_tokens_in_payload(monkeypatch):
 
     monkeypatch.setattr(api, "_post", fake_post)
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     api.stream_completion(
         model="deepseek-v4-flash",
@@ -234,7 +234,7 @@ def test_max_tokens_in_payload(monkeypatch):
 
 def test_max_tokens_default_from_config(monkeypatch):
     """未显式指定时,默认取配置 MAX_OUTPUT_TOKENS。"""
-    monkeypatch.setenv("SGPT_MAX_OUTPUT_TOKENS", "512")
+    monkeypatch.setenv("PS_MAX_OUTPUT_TOKENS", "512")
     from pocketshell.config import cfg
     assert cfg.get_int("MAX_OUTPUT_TOKENS", 4096) == 512
 
@@ -270,9 +270,9 @@ def test_default_chat_persists(tmp_path, monkeypatch):
     """未指定 --chat 时，提问应保存到常驻默认会话 default.json。"""
     from pocketshell import cli
 
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path))
-    monkeypatch.setenv("SGPT_CONFIG_PATH", str(tmp_path / "config.json"))
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("PS_CONFIG_PATH", str(tmp_path / "config.json"))
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     def fake_post(url, headers, payload, timeout):
         return 200, FakeResponse(_sse(_content_chunk("你好！")))
@@ -293,9 +293,9 @@ def test_clear_default_chat(tmp_path, monkeypatch):
     """--clear default 应删除常驻默认会话文件。"""
     from pocketshell import cli
 
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path))
-    monkeypatch.setenv("SGPT_CONFIG_PATH", str(tmp_path / "config.json"))
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("PS_CONFIG_PATH", str(tmp_path / "config.json"))
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     # 先造一个会话文件
     (tmp_path / "default.json").write_text(
@@ -318,7 +318,7 @@ def test_system_prompt_refreshes_cwd(tmp_path, monkeypatch):
     from pocketshell import api, cli
     from pocketshell.session import Session
 
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path))
 
     def fake_run(session, **kw):
         session.add_assistant("ok")
@@ -367,7 +367,7 @@ def test_stream_usage_reported(monkeypatch):
 
     monkeypatch.setattr(api, "_post", fake_post)
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     captured = {}
     content, _, _ = api.stream_completion(
@@ -402,7 +402,7 @@ def test_run_conversation_forwards_usage(tmp_session, monkeypatch):
     fake_post.called = False
     monkeypatch.setattr(api, "_post", fake_post)
     monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
-    monkeypatch.setenv("SGPT_API_KEY", "test-key")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
 
     usages = []
     tmp_session.add_user("继续")
@@ -463,7 +463,7 @@ def test_urllib_end_to_end_streaming(monkeypatch):
     thread.start()
     try:
         monkeypatch.setattr(api, "_url", lambda: f"http://127.0.0.1:{port}/chat/completions")
-        monkeypatch.setenv("SGPT_API_KEY", "test-key")
+        monkeypatch.setenv("PS_API_KEY", "test-key")
         usages = []
         content, tools, reasoning = api.stream_completion(
             model="deepseek-v4-flash",
@@ -505,7 +505,7 @@ def test_urllib_http_error_path(monkeypatch):
     thread.start()
     try:
         monkeypatch.setattr(api, "_url", lambda: f"http://127.0.0.1:{port}/chat/completions")
-        monkeypatch.setenv("SGPT_API_KEY", "test-key")
+        monkeypatch.setenv("PS_API_KEY", "test-key")
         with pytest.raises(api.ApiError) as exc:
             api.stream_completion(
                 model="deepseek-v4-flash",

@@ -37,7 +37,7 @@ is a single directory.
 
 1. Unzip anywhere — **the folder name doesn't matter**. The whole folder is self-contained.
 2. Configure your API key (either):
-   - Set env var `SGPT_API_KEY=sk-xxx`; or
+   - Set env var `PS_API_KEY=sk-xxx`; or
    - On first run `config.json` is generated automatically — open it and fill in
      `"OPENAI_API_KEY": ""`.
    - Get a key: https://platform.deepseek.com/api_keys
@@ -148,7 +148,7 @@ Supports `//` comments, editable in VS Code:
 {
   // Model & API
   "DEFAULT_MODEL": "deepseek-v4-flash",   // or deepseek-v4-pro
-  "OPENAI_API_KEY": "sk-xxx",             // required; or env var SGPT_API_KEY
+  "OPENAI_API_KEY": "sk-xxx",             // required; or env var PS_API_KEY
   "API_BASE_URL": "https://api.deepseek.com",
 
   // Context & tokens (key to savings)
@@ -180,8 +180,8 @@ Supports `//` comments, editable in VS Code:
 }
 ```
 
-- **Precedence**: env var > config.json > built-in default; env vars use `SGPT_`+key
-  (e.g. `SGPT_CONTEXT_TOKEN_BUDGET`)
+- **Precedence**: env var > config.json > built-in default; env vars use `PS_`+key
+  (e.g. `PS_CONTEXT_TOKEN_BUDGET`; legacy `SGPT_*` prefix still works)
 - **When it takes effect**: restart; CLI flags (`--model`/`--temperature`/`--max-output` etc.)
   override config for that run
 

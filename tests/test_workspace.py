@@ -140,8 +140,8 @@ def _has_system(msgs):
 def test_system_injected_on_first_turn(tmp_path, monkeypatch):
     from pocketshell.session import Session
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path / "sess"))
-    monkeypatch.setenv("SGPT_SYSTEM_PROMPT_INTERVAL", "3")
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path / "sess"))
+    monkeypatch.setenv("PS_SYSTEM_PROMPT_INTERVAL", "3")
     s = Session("t")
     s.system("SYS")
     s.add_user("q1")
@@ -151,8 +151,8 @@ def test_system_injected_on_first_turn(tmp_path, monkeypatch):
 def test_system_skipped_between_intervals(tmp_path, monkeypatch):
     from pocketshell.session import Session
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path / "sess"))
-    monkeypatch.setenv("SGPT_SYSTEM_PROMPT_INTERVAL", "3")
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path / "sess"))
+    monkeypatch.setenv("PS_SYSTEM_PROMPT_INTERVAL", "3")
     s = Session("t")
     s.system("SYS")
     # 轮1: 注入;轮2/3: 跳过;轮4: 注入
@@ -168,8 +168,8 @@ def test_system_skipped_between_intervals(tmp_path, monkeypatch):
 def test_system_interval_1_injects_every_turn(tmp_path, monkeypatch):
     from pocketshell.session import Session
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path / "sess"))
-    monkeypatch.setenv("SGPT_SYSTEM_PROMPT_INTERVAL", "1")
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path / "sess"))
+    monkeypatch.setenv("PS_SYSTEM_PROMPT_INTERVAL", "1")
     s = Session("t")
     s.system("SYS")
     for i in range(1, 5):
@@ -184,8 +184,8 @@ def test_system_force_injects_when_cwd_changed(tmp_path, monkeypatch):
     b = tmp_path / "b"
     a.mkdir(); b.mkdir()
     monkeypatch.chdir(a)
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path / "sess"))
-    monkeypatch.setenv("SGPT_SYSTEM_PROMPT_INTERVAL", "3")
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path / "sess"))
+    monkeypatch.setenv("PS_SYSTEM_PROMPT_INTERVAL", "3")
     s = Session("t")
     s.system("SYS")
     s.add_user("q1"); s.messages_for_api()
@@ -204,8 +204,8 @@ def test_cwd_prefix_change_forces_system_injection(tmp_path, monkeypatch):
     parent.mkdir()
     child.mkdir()
     monkeypatch.chdir(child)
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path / "sess"))
-    monkeypatch.setenv("SGPT_SYSTEM_PROMPT_INTERVAL", "3")
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path / "sess"))
+    monkeypatch.setenv("PS_SYSTEM_PROMPT_INTERVAL", "3")
     s = Session("t")
     # 用 _run_turn 的刷新逻辑:构造"已注入过"的会话,cwd 随后变到父目录
     from pocketshell.api import make_system_prompt
@@ -220,3 +220,28 @@ def test_cwd_prefix_change_forces_system_injection(tmp_path, monkeypatch):
     assert s.messages[0]["content"] != new_prompt  # 精确比较能检出变化
     # 且旧子串判断会漏:父目录是子串
     assert str(parent) in s.messages[0]["content"]  # 旧逻辑:父目录是子串 -> 漏检
+
+
+# ---------------- 环境变量前缀:PS_ 新名 / SGPT_ 旧名兼容 ----------------
+
+def test_env_prefix_ps_preferred_over_sgpt(monkeypatch):
+    from pocketshell.config import Config
+    monkeypatch.setenv("PS_CONTEXT_TOKEN_BUDGET", "111")
+    monkeypatch.setenv("SGPT_CONTEXT_TOKEN_BUDGET", "222")
+    assert Config().get("CONTEXT_TOKEN_BUDGET") == "111"
+
+
+def test_env_prefix_sgpt_compat(monkeypatch):
+    from pocketshell.config import Config
+    monkeypatch.delenv("PS_CONTEXT_TOKEN_BUDGET", raising=False)
+    monkeypatch.setenv("SGPT_CONTEXT_TOKEN_BUDGET", "222")
+    assert Config().get("CONTEXT_TOKEN_BUDGET") == "222"
+
+
+def test_api_key_env_ps_and_sgpt(monkeypatch):
+    from pocketshell.config import Config
+    monkeypatch.setenv("PS_API_KEY", "sk-ps")
+    monkeypatch.setenv("SGPT_API_KEY", "sk-sgpt")
+    assert Config().get_api_key() == "sk-ps"
+    monkeypatch.delenv("PS_API_KEY")
+    assert Config().get_api_key() == "sk-sgpt"

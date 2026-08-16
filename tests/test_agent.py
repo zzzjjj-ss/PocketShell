@@ -153,7 +153,7 @@ def test_clean_keeps_complete_tool_chain():
 @pytest.fixture()
 def tmp_session(tmp_path, monkeypatch):
     # Session 从 cfg 动态读取 SESSIONS_DIR，setenv 即可生效
-    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path))
     return Session("test")
 
 
@@ -168,7 +168,7 @@ def test_session_save_load_utf8(tmp_session):
 
 
 def test_session_token_truncation(tmp_session, monkeypatch):
-    monkeypatch.setenv("SGPT_CONTEXT_TOKEN_BUDGET", "34")
+    monkeypatch.setenv("PS_CONTEXT_TOKEN_BUDGET", "34")
     # 塞入大量消息触发截断
     big = "x" * 100  # ~33 tokens
     tmp_session.add_user("u1")
@@ -181,7 +181,7 @@ def test_session_token_truncation(tmp_session, monkeypatch):
 
 
 def test_session_system_kept_on_truncation(tmp_session, monkeypatch):
-    monkeypatch.setenv("SGPT_CONTEXT_TOKEN_BUDGET", "30")
+    monkeypatch.setenv("PS_CONTEXT_TOKEN_BUDGET", "30")
     tmp_session.ensure_system("system-prompt")
     tmp_session.add_user("u1")
     tmp_session.add_assistant("x" * 100)
@@ -210,7 +210,7 @@ def test_run_tool_bad_args():
 
 def test_run_tool_remember_recall(tmp_path, monkeypatch):
     mem = tmp_path / "mem.txt"
-    monkeypatch.setenv("SGPT_MEMORY_FILE", str(mem))
+    monkeypatch.setenv("PS_MEMORY_FILE", str(mem))
     out = run_tool("remember", json.dumps({"info": "用户的目录是 D:\\work"}))
     assert "已记住" in out
     out2 = run_tool("recall", json.dumps({"query": "目录"}))
@@ -220,7 +220,7 @@ def test_run_tool_remember_recall(tmp_path, monkeypatch):
 def test_execute_shell_blocked(tmp_path, monkeypatch):
     """BLOCK 指令应返回拦截消息,不真正执行。"""
     mem = tmp_path / "mem.txt"
-    monkeypatch.setenv("SGPT_MEMORY_FILE", str(mem))
+    monkeypatch.setenv("PS_MEMORY_FILE", str(mem))
     out = run_tool("execute_shell_command", json.dumps({"shell_command": "rm -rf /tmp/x"}))
     assert "拦截" in out and "未执行" in out
 
@@ -302,7 +302,7 @@ def test_config_file_value_overrides_default(tmp_path, monkeypatch):
 
 
 def test_never_overwrites_existing_config(tmp_path, monkeypatch):
-    """已存在的 config.json 绝不能被 ensure_config_file 覆盖/升级。"""
+    """已存在的 config.json 不会被覆盖：已有键值原样保留，仅补充模板新增的键。"""
     from pocketshell import config as config_mod
 
     cfg_path = tmp_path / "config.json"
@@ -312,8 +312,13 @@ def test_never_overwrites_existing_config(tmp_path, monkeypatch):
 
     config_mod.ensure_config_file()
     text = cfg_path.read_text(encoding="utf-8")
-    # 文件内容完全不变，key 原样保留
-    assert text == '{ "OPENAI_API_KEY": "sk-existing" }'
+    # 已有 key 原样保留
+    assert '"sk-existing"' in text
+    # 模板新增的键被补进（如 SYSTEM_PROMPT_INTERVAL），且文件仍是合法 JSON
+    import json as _json
+    data = _json.loads(config_mod._strip_json_comments(text))
+    assert data["OPENAI_API_KEY"] == "sk-existing"
+    assert "SYSTEM_PROMPT_INTERVAL" in data
 
 
 # ---------------- 编码容错、注释剥离与迁移 ----------------
@@ -427,7 +432,7 @@ def test_migrate_old_sgptrc_key(tmp_path, monkeypatch):
 
 def test_forget_removes_matching_entries(tmp_path, monkeypatch):
     mem = tmp_path / "mem.txt"
-    monkeypatch.setenv("SGPT_MEMORY_FILE", str(mem))
+    monkeypatch.setenv("PS_MEMORY_FILE", str(mem))
     run_tool("remember", json.dumps({"info": "ffmpeg 在 D:\\tools\\ffmpeg"}))
     run_tool("remember", json.dumps({"info": "Python 在 C:\\Python"}))
     out = run_tool("forget", json.dumps({"info": "ffmpeg"}))
@@ -439,7 +444,7 @@ def test_forget_removes_matching_entries(tmp_path, monkeypatch):
 
 def test_forget_no_match(tmp_path, monkeypatch):
     mem = tmp_path / "mem.txt"
-    monkeypatch.setenv("SGPT_MEMORY_FILE", str(mem))
+    monkeypatch.setenv("PS_MEMORY_FILE", str(mem))
     run_tool("remember", json.dumps({"info": "某条记忆"}))
     out = run_tool("forget", json.dumps({"info": "不存在的关键词"}))
     assert "未找到" in out
@@ -447,7 +452,7 @@ def test_forget_no_match(tmp_path, monkeypatch):
 
 def test_update_memory_replaces(tmp_path, monkeypatch):
     mem = tmp_path / "mem.txt"
-    monkeypatch.setenv("SGPT_MEMORY_FILE", str(mem))
+    monkeypatch.setenv("PS_MEMORY_FILE", str(mem))
     run_tool("remember", json.dumps({"info": "工作目录是 D:\\old\\work"}))
     out = run_tool("update_memory", json.dumps({
         "old_info": "D:\\old\\work",
@@ -523,7 +528,7 @@ def test_self_dir_unrelated_delete_still_blocked():
 def test_custom_instructions_appended(monkeypatch):
     """config.json 的 CUSTOM_INSTRUCTIONS 应追加到系统提示词末尾。"""
     from pocketshell import api
-    monkeypatch.setenv("SGPT_CUSTOM_INSTRUCTIONS", "永远用简体中文回答；提到文件时给出完整路径")
+    monkeypatch.setenv("PS_CUSTOM_INSTRUCTIONS", "永远用简体中文回答；提到文件时给出完整路径")
     prompt = api.make_system_prompt()
     assert "【用户自定义指令】" in prompt
     assert "永远用简体中文回答" in prompt
@@ -536,7 +541,7 @@ def test_custom_instructions_appended(monkeypatch):
 def test_custom_instructions_empty(monkeypatch):
     """未设置时提示词不含自定义指令段。"""
     from pocketshell import api
-    monkeypatch.delenv("SGPT_CUSTOM_INSTRUCTIONS", raising=False)
+    monkeypatch.delenv("PS_CUSTOM_INSTRUCTIONS", raising=False)
     prompt = api.make_system_prompt()
     assert "【用户自定义指令】" not in prompt
 
@@ -582,15 +587,15 @@ def test_delete_stays_block_not_confirm(tmp_path):
 
 def test_write_confirm_noninteractive_denied(tmp_path, monkeypatch):
     """FILE_WRITE_CONFIRM=true 且非交互（无输入）→ 拒绝执行。"""
-    monkeypatch.setenv("SGPT_MEMORY_FILE", str(tmp_path / "mem.txt"))
+    monkeypatch.setenv("PS_MEMORY_FILE", str(tmp_path / "mem.txt"))
     out = run_tool("execute_shell_command", json.dumps({"shell_command": "echo hi > x.txt"}))
     assert "未执行" in out
 
 
 def test_write_confirm_disabled_runs(tmp_path, monkeypatch):
     """FILE_WRITE_CONFIRM=false 时写文件命令直接执行。"""
-    monkeypatch.setenv("SGPT_MEMORY_FILE", str(tmp_path / "mem.txt"))
-    monkeypatch.setenv("SGPT_FILE_WRITE_CONFIRM", "false")
+    monkeypatch.setenv("PS_MEMORY_FILE", str(tmp_path / "mem.txt"))
+    monkeypatch.setenv("PS_FILE_WRITE_CONFIRM", "false")
     from pocketshell import tools as _tools
     from pocketshell import utils as _utils
     calls = []

@@ -173,7 +173,7 @@ def stream_completion(
 
         if status_code == 401:
             raise ApiError(
-                "API Key 无效或未授权（401）。请检查 SGPT_API_KEY 配置。",
+                "API Key 无效或未授权（401）。请检查 PS_API_KEY 配置。",
                 status_code=401,
             )
         if status_code == 429:

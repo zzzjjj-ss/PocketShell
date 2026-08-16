@@ -35,7 +35,7 @@ PocketShell 是一个面向 Windows 的终端 AI 助手(shell agent),基于 Deep
 
 1. 解压到任意位置、**目录名随意**,整个目录自包含、可随时搬家。
 2. 配置 API Key(二选一):
-   - 设置环境变量 `SGPT_API_KEY=sk-xxx`;或
+   - 设置环境变量 `PS_API_KEY=sk-xxx`;或
    - 首次运行自动生成 `config.json`,用编辑器打开,把 `"OPENAI_API_KEY": ""` 改成你的 key。
    - API Key 获取:https://platform.deepseek.com/api_keys
 3. 运行(启动脚本不改变你的当前目录):
@@ -141,7 +141,7 @@ pocketshell/
 {
   // 模型与 API
   "DEFAULT_MODEL": "deepseek-v4-flash",   // 或 deepseek-v4-pro
-  "OPENAI_API_KEY": "sk-xxx",             // 必填;也可用环境变量 SGPT_API_KEY
+  "OPENAI_API_KEY": "sk-xxx",             // 必填;也可用环境变量 PS_API_KEY
   "API_BASE_URL": "https://api.deepseek.com",
 
   // 上下文与 token(省 token 关键)
@@ -173,7 +173,7 @@ pocketshell/
 }
 ```
 
-- **优先级**:环境变量 > config.json > 内置默认;环境变量用 `SGPT_`+键名(如 `SGPT_CONTEXT_TOKEN_BUDGET`)
+- **优先级**:环境变量 > config.json > 内置默认;环境变量用 `PS_`+键名(如 `PS_CONTEXT_TOKEN_BUDGET`;旧前缀 `SGPT_*` 仍兼容)
 - **生效时机**:修改后重启;命令行参数(`--model`/`--temperature`/`--max-output` 等)临时覆盖配置
 - **路径项留空**:自动落在项目目录内(`sessions/`、`memory.txt`),拷走目录即迁移
 

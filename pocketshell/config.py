@@ -7,16 +7,17 @@
 - 数据文件（sessions/、memory.txt）默认也在 agent 目录下，拷走整个目录即完成迁移。
 - 不阻塞：首次运行绝不交互式询问（getpass），API Key 缺失时给出明确报错与获取链接。
 
-环境变量命名规则：SGPT_ + 配置键名（如 CONTEXT_TOKEN_BUDGET → SGPT_CONTEXT_TOKEN_BUDGET）；
-另有几个裸键别名：OPENAI_API_KEY / SGPT_API_KEY 均可设置 API Key。
+环境变量命名规则：PS_ + 配置键名（如 CONTEXT_TOKEN_BUDGET → PS_CONTEXT_TOKEN_BUDGET）；
+旧前缀 SGPT_*（shell-gpt 遗产）继续兼容；另有裸键别名 OPENAI_API_KEY / PS_API_KEY 均可设置 API Key。
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 # 项目根目录（解压根 / 仓库根）：包目录的父目录。
 # 所有用户数据（config.json / sessions/ / memory.txt）默认放这里，
@@ -26,7 +27,11 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 # agent 包所在目录（程序文件；自毁防护保护整个 ROOT_DIR）
 AGENT_DIR = Path(__file__).resolve().parent
 
-CONFIG_PATH = Path(os.environ.get("SGPT_CONFIG_PATH", ROOT_DIR / "config.json"))
+CONFIG_PATH = Path(os.environ.get("PS_CONFIG_PATH", os.environ.get("SGPT_CONFIG_PATH", ROOT_DIR / "config.json")))
+
+# 环境变量前缀：新名 PS_（PocketShell）优先，旧名 SGPT_（shell-gpt 遗产）兼容。
+# 老用户已设置 SGPT_* 的无需改动，新文档一律用 PS_。
+_ENV_PREFIXES = ("PS_", "SGPT_")
 
 # 内置默认值（均为字符串，与配置文件的键值格式一致）
 # 注意：这里只放常量默认值；环境变量由 Config.get 每次实时读取（优先于本表）。
@@ -166,8 +171,12 @@ class Config:
             self._read()
 
     def get(self, key: str) -> str:
-        # 环境变量优先：裸键（OPENAI_API_KEY）与 SGPT_+键名 均可
-        env_value = os.environ.get(key) or os.environ.get("SGPT_" + key)
+        # 环境变量优先：裸键（OPENAI_API_KEY）与 PS_/SGPT_+键名 均可
+        for prefix in _ENV_PREFIXES:
+            env_value = os.environ.get(prefix + key)
+            if env_value is not None:
+                return env_value
+        env_value = os.environ.get(key)
         if env_value is not None:
             return env_value
         if key in self._file_values:
@@ -189,15 +198,20 @@ class Config:
             return fallback
 
     def get_api_key(self) -> str:
-        # 兼容三种来源：裸键 OPENAI_API_KEY、SGPT_OPENAI_API_KEY、SGPT_API_KEY
-        key = (
-            self.get("OPENAI_API_KEY").strip()
-            or os.environ.get("SGPT_API_KEY", "").strip()
-        )
+        # 兼容多种来源：裸键 OPENAI_API_KEY、PS_OPENAI_API_KEY、SGPT_OPENAI_API_KEY、
+        # PS_API_KEY、SGPT_API_KEY（新前缀优先）
+        key = ""
+        for name in ("PS_API_KEY", "SGPT_API_KEY"):
+            v = os.environ.get(name, "").strip()
+            if v:
+                key = v
+                break
+        if not key:
+            key = self.get("OPENAI_API_KEY").strip()
         if not key:
             raise RuntimeError(
                 "未配置 DeepSeek API Key。\n"
-                "  方式一（推荐）：设置环境变量 SGPT_API_KEY=sk-xxx\n"
+                "  方式一（推荐）：设置环境变量 PS_API_KEY=sk-xxx\n"
                 "  方式二：把 Key 写入配置文件后重试\n"
                 f"  配置文件路径: {self.path}\n"
                 "  API Key 获取: https://platform.deepseek.com/api_keys"
@@ -221,9 +235,9 @@ cfg = Config()
 _CONFIG_TEMPLATE = """{
   // ============ agent 配置文件（config.json） ============
   // 优先级：环境变量 > 本文件 > 内置默认值。
-  // 环境变量规则：SGPT_ + 键名（如 CONTEXT_TOKEN_BUDGET → SGPT_CONTEXT_TOKEN_BUDGET）。
-  // 修改后重启 agent 生效；注释请独占一行（行内 // 会被当作注释内容删除）。
-  // API Key 也可用环境变量 SGPT_API_KEY 或 OPENAI_API_KEY 设置。
+  // 环境变量规则：PS_ + 键名（如 CONTEXT_TOKEN_BUDGET → PS_CONTEXT_TOKEN_BUDGET）。
+  // 旧前缀 SGPT_* 仍兼容；修改后重启 agent 生效；注释请独占一行（行内 // 会被当作注释内容删除）。
+  // API Key 也可用环境变量 PS_API_KEY / SGPT_API_KEY 或 OPENAI_API_KEY 设置。
 
   // ---------- 模型与 API ----------
   // 默认模型：deepseek-v4-flash（快） / deepseek-v4-pro（强）
@@ -293,6 +307,92 @@ def _write_config_template(api_key: str = "") -> None:
         pass
 
 
+def _template_key_blocks() -> List[tuple]:
+    """从模板中提取 (前导注释块, 键行) 列表，供合并缺失键使用。
+
+    返回 [(comment_lines, key_line), ...]，comment_lines 为注释文本行（含 // 与空行）。
+    """
+    lines = _CONFIG_TEMPLATE.splitlines()
+    blocks: List[tuple] = []
+    pending_comments: List[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("//") or not stripped:
+            pending_comments.append(line)
+            continue
+        m = re.match(r'^\s*"([A-Za-z_]+)"\s*:', line)
+        if m:
+            blocks.append((pending_comments, line))
+            pending_comments = []
+    return blocks
+
+
+def _merge_missing_template_keys() -> bool:
+    """把模板中有、现有 config.json 缺失的键（连同注释）补进文件，保留已有值。
+
+    已存在的 config.json 不会被覆盖，只是补齐新版本新增的配置项
+    （否则老用户的 config.json 永远看不到新参数）。返回是否写入了新键。
+    """
+    if not cfg.path.exists():
+        return False
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "gbk", "latin-1"):
+        try:
+            text = cfg.path.read_text(encoding=enc)
+            break
+        except (OSError, UnicodeDecodeError):
+            continue
+    if text is None:
+        return False
+    try:
+        data = json.loads(_strip_json_comments(text))
+    except (json.JSONDecodeError, TypeError):
+        return False  # 文件损坏/非法，不动
+    if not isinstance(data, dict):
+        return False
+
+    missing = []
+    for comments, key_line in _template_key_blocks():
+        m = re.match(r'^\s*"([A-Za-z_]+)"\s*:', key_line)
+        key = m.group(1)
+        if key not in data:
+            missing.append((comments, key_line))
+    if not missing:
+        return False
+
+    # 组装插入块：注释 + 键行，缩进对齐（模板是 2 空格）
+    insert_lines = []
+    for comments, key_line in missing:
+        for c in comments:
+            insert_lines.append("  " + c.strip() if c.strip() else "")
+        insert_lines.append(key_line)
+    # 插入块会放在文件末尾（最后一个键之后），末行不能带尾逗号
+    if insert_lines and insert_lines[-1].rstrip().endswith(","):
+        insert_lines[-1] = insert_lines[-1].rstrip()[:-1]
+    block = "\n".join(insert_lines)
+
+    # 在最后一个 "}" 前插入；同时保证前一键行有逗号
+    rindex = text.rfind("}")
+    if rindex < 0:
+        return False
+    head, tail = text[:rindex], text[rindex:]
+    head = head.rstrip()
+    if not head.endswith(","):
+        # 找最后一行非空行，补逗号
+        lines = head.splitlines()
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].strip():
+                lines[i] = lines[i].rstrip() + ","
+                break
+        head = "\n".join(lines)
+    new_text = head + "\n" + block + "\n" + tail
+    try:
+        cfg.path.write_text(new_text, encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
 def _migrate_old_sgptrc() -> str:
     """迁移旧版 config/.sgptrc 中的 API Key（如有），返回提取到的 key。
 
@@ -325,12 +425,14 @@ def _migrate_old_sgptrc() -> str:
 
 
 def ensure_config_file() -> None:
-    """仅在 config.json 不存在时生成完整模板；自动迁移旧 .sgptrc 的 API Key。
-
-    ⚠️ 已存在的 config.json 绝不动，避免破坏用户配置。需要重新生成模板时
-    请手动删除 config.json。
+    """确保配置文件就绪：
+    - config.json 不存在 → 生成完整模板（自动迁移旧 .sgptrc 的 API Key）。
+    - config.json 已存在 → 绝不覆盖已有值，但会自动补齐新版本新增的配置项
+      （如 SYSTEM_PROMPT_INTERVAL），老用户升级后也能看到新参数。
     """
     if cfg.path.exists():
+        _merge_missing_template_keys()
+        cfg.reload()  # 合并后同进程立即读到新键
         return
     old_key = _migrate_old_sgptrc()
     _write_config_template(old_key)
