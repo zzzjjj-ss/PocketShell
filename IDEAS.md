@@ -17,4 +17,8 @@
   - 任何删除类操作(rm / del / Remove-Item / rmdir 等)→ 维持 BLOCK,提示「请用户手动删除」
   - workspace 外 → 维持现状(写 CONFIRM,删 BLOCK)
 - CLI:新增 `-setworkspace` 参数;不带值时取当前 cwd;`-setworkspace off` 关闭
+- **授权生命周期(补充,zhang 2026-08-17)**:workspace 授权绑定「会话 + 当前目录」,**不是永久生效**——
+  - 用户**关闭 cmd 窗口** → 授权失效,下次启动需重新 `-setworkspace`
+  - 用户 **cd 离开该目录** → 授权立即失效,回到目录也需重新授权(以 cwd != WORKSPACE_DIR 为准)
+  - 实现:WORKSPACE_DIR 存**内存/会话文件**,不写进持久 config.json(避免跨窗口残留);每次执行工具前校验 os.getcwd() 是否仍等于 WORKSPACE_DIR,不等则视为未授权
 - 安全语义:workspace 是用户显式授权的地盘,写权限放开但删除永远锁死——守住「绝对安全」底线
