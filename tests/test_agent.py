@@ -401,33 +401,6 @@ def test_same_process_reads_generated_config(tmp_path, monkeypatch):
     assert config_mod.cfg.get("OPENAI_API_KEY") == "sk-after-edit"
 
 
-def test_migrate_old_sgptrc_key(tmp_path, monkeypatch):
-    """旧版 config/.sgptrc 的 API Key 应迁移进 config.json，旧文件被清理。"""
-    from pocketshell import config as config_mod
-
-    # 旧版目录结构在项目根下；mock ROOT_DIR 避免污染真实仓库
-    monkeypatch.setattr(config_mod, "ROOT_DIR", tmp_path)
-    old_dir = config_mod.ROOT_DIR / "config"
-    old_dir.mkdir(parents=True, exist_ok=True)
-    old_file = old_dir / ".sgptrc"
-    old_file.write_text(
-        "# agent 配置文件\nOPENAI_API_KEY=sk-migrated-key\n", encoding="utf-8"
-    )
-    cfg_path = tmp_path / "config.json"
-    monkeypatch.setattr(config_mod, "CONFIG_PATH", cfg_path)
-    monkeypatch.setattr(config_mod.cfg, "path", cfg_path)
-
-    config_mod.ensure_config_file()
-    # config.json 已生成且含迁移的 key
-    assert cfg_path.exists()
-    assert config_mod.cfg.get("OPENAI_API_KEY") == "sk-migrated-key"
-    # 旧 .sgptrc 已删除（config/ 目录若空也删除）
-    assert not old_file.exists()
-    # 清理：删掉可能残留的 config 目录（防止污染 workspace）
-    if old_dir.exists() and not any(old_dir.iterdir()):
-        old_dir.rmdir()
-
-
 # ---------------- 记忆删除与修改 ----------------
 
 def test_forget_removes_matching_entries(tmp_path, monkeypatch):

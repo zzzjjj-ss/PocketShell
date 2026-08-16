@@ -3,7 +3,7 @@
 
 设计原则（零安装、便携）：
 - 唯一配置文件为 agent 根目录下 config.json（与 run.bat 同级），含全部配置项与注释，
-  首次运行自动生成完整模板；旧版 config/.sgptrc 会在首次运行时自动迁移并清理。
+  首次运行自动生成完整模板。
 - 数据文件（sessions/、memory.txt）默认也在 agent 目录下，拷走整个目录即完成迁移。
 - 不阻塞：首次运行绝不交互式询问（getpass），API Key 缺失时给出明确报错与获取链接。
 
@@ -29,7 +29,7 @@ AGENT_DIR = Path(__file__).resolve().parent
 
 CONFIG_PATH = Path(os.environ.get("PS_CONFIG_PATH", ROOT_DIR / "config.json"))
 
-# 环境变量前缀：PS_（PocketShell）。旧前缀 SGPT_（shell-gpt 遗产）已移除。
+# 环境变量前缀：PS_（PocketShell）
 _ENV_PREFIX = "PS_"
 
 # 内置默认值（均为字符串，与配置文件的键值格式一致）
@@ -289,9 +289,9 @@ _CONFIG_TEMPLATE = """{
 """
 
 
-def _write_config_template(api_key: str = "") -> None:
+def _write_config_template() -> None:
     # 用占位符替换而非 .format()，避免 JSON 花括号与格式串冲突
-    text = _CONFIG_TEMPLATE.replace("__OPENAI_API_KEY__", api_key)
+    text = _CONFIG_TEMPLATE.replace("__OPENAI_API_KEY__", "")
     try:
         cfg.path.parent.mkdir(parents=True, exist_ok=True)
         cfg.path.write_text(text, encoding="utf-8")
@@ -385,47 +385,15 @@ def _merge_missing_template_keys() -> bool:
     return True
 
 
-def _migrate_old_sgptrc() -> str:
-    """迁移旧版 config/.sgptrc 中的 API Key（如有），返回提取到的 key。
-
-    迁移完成后删除旧文件与空的 config/ 目录。
-    """
-    old_path = ROOT_DIR / "config" / ".sgptrc"
-    if not old_path.exists():
-        return ""
-    text = None
-    for enc in ("utf-8-sig", "utf-8", "gbk", "latin-1"):
-        try:
-            text = old_path.read_text(encoding=enc)
-            break
-        except (OSError, UnicodeDecodeError):
-            continue
-    old_key = ""
-    if text:
-        for line in text.splitlines():
-            line = line.strip()
-            if line.startswith("OPENAI_API_KEY") and "=" in line:
-                old_key = line.partition("=")[2].strip()
-    try:
-        old_path.unlink(missing_ok=True)
-        config_dir = old_path.parent
-        if config_dir.exists() and not any(config_dir.iterdir()):
-            config_dir.rmdir()
-    except OSError:
-        pass
-    return old_key
-
-
 def ensure_config_file() -> None:
     """确保配置文件就绪：
-    - config.json 不存在 → 生成完整模板（自动迁移旧 .sgptrc 的 API Key）。
+    - config.json 不存在 → 生成完整模板。
     - config.json 已存在 → 绝不覆盖已有值，但会自动补齐新版本新增的配置项
-      （如 SYSTEM_PROMPT_INTERVAL），老用户升级后也能看到新参数。
+      （如 SYSTEM_PROMPT_INTERVAL），升级后也能看到新参数。
     """
     if cfg.path.exists():
         _merge_missing_template_keys()
         cfg.reload()  # 合并后同进程立即读到新键
         return
-    old_key = _migrate_old_sgptrc()
-    _write_config_template(old_key)
+    _write_config_template()
     cfg.reload()  # 同进程立即读到刚生成的配置
