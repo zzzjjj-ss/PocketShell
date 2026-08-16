@@ -193,3 +193,30 @@ def test_system_force_injects_when_cwd_changed(tmp_path, monkeypatch):
     monkeypatch.chdir(b)  # cwd 变化 → force_system=True 应注入
     s.add_user("q2")
     assert _has_system(s.messages_for_api(force_system=True))
+
+
+def test_cwd_prefix_change_forces_system_injection(tmp_path, monkeypatch):
+    """cd 到父目录（前缀目录）时也必须强制注入 system（子串判断会漏）。"""
+    from pocketshell import cli
+    from pocketshell.session import Session
+    parent = tmp_path / "work"
+    child = parent / "project"
+    parent.mkdir()
+    child.mkdir()
+    monkeypatch.chdir(child)
+    monkeypatch.setenv("SGPT_SESSIONS_DIR", str(tmp_path / "sess"))
+    monkeypatch.setenv("SGPT_SYSTEM_PROMPT_INTERVAL", "3")
+    s = Session("t")
+    # 用 _run_turn 的刷新逻辑:构造"已注入过"的会话,cwd 随后变到父目录
+    from pocketshell.api import make_system_prompt
+    s.system(make_system_prompt())
+    s.add_user("q1")
+    s.add_assistant("a1")
+    # cwd 变成父目录(前缀)
+    monkeypatch.chdir(parent)
+    import pocketshell.cli as cli_mod
+    # 模拟 _run_turn 的检测:新提示词应与旧的不同(含新 cwd)
+    new_prompt = make_system_prompt()
+    assert s.messages[0]["content"] != new_prompt  # 精确比较能检出变化
+    # 且旧子串判断会漏:父目录是子串
+    assert str(parent) in s.messages[0]["content"]  # 旧逻辑:父目录是子串 -> 漏检

@@ -75,15 +75,17 @@ def _run_turn(
 ) -> str:
     import os as _os
 
-    # system 提示词含"当前工作目录"：每次提问前刷新，目录变化后模型不会用过时的 cwd
+    # system 提示词含"当前工作目录"：每次提问前刷新，目录变化后模型不会用过时的 cwd。
+    # 用整段提示词精确比较（而不是子串判断），避免"cd 到父目录"这类前缀目录
+    # 变化被漏掉（如 D:\work\project -> D:\work 中 /work 是 /work/project 的子串）。
     system_text = make_system_prompt()
     force_system = False
     if not session.messages or session.messages[0].get("role") != "system":
         session.system(system_text)
         force_system = True  # 首轮必注入
-    elif _os.getcwd() not in session.messages[0].get("content", ""):
+    elif session.messages[0].get("content") != system_text:
         session.messages[0]["content"] = system_text
-        force_system = True  # cwd 变化：本轮强制注入最新 system
+        force_system = True  # cwd（或自定义指令）变化：本轮强制注入最新 system
     session.add_user(prompt)
     tools = get_tool_schemas() if use_tools else None
     print(f"\n\033[90m[会话: {session.name}] 提问: {prompt}\033[0m" if not sys.stdout.isatty() else "", end="")
