@@ -644,3 +644,40 @@ def test_render_stream_disabled():
     r = MarkdownStreamRenderer(color=False)
     assert r.feed("```\nx\n```") == "```\nx\n```"
     assert r.reset() == ""
+
+
+# ---------------- setup/ 安装脚本静态验证 ----------------
+
+def test_install_ps1_generates_cmd_entry():
+    """install.ps1 应包含正确的命令入口模板与命令名校验。"""
+    import re
+    setup_dir = Path(__file__).resolve().parent.parent / "setup"
+    src = (setup_dir / "install.ps1").read_text(encoding="utf-8")
+    # UTF-8 BOM
+    assert src.startswith("\ufeff"), "install.ps1 必须带 UTF-8 BOM(Windows PS 5.1 中文不乱码)"
+    # 命令名校验
+    assert re.search(r"CmdName.*-notmatch.*\^\[A-Za-z0-9_-\]\+", src)
+    # 生成的 cmd 模板:指向上级目录的 pocketshell 包
+    assert 'python "%~dp0..\\pocketshell\\__main__.py" %*' in src
+    assert "@echo off" in src
+    # PATH 只改用户级
+    assert "GetEnvironmentVariable('Path', 'User')" in src
+    assert "SetEnvironmentVariable('Path'" in src
+
+
+def test_uninstall_ps1_bom_and_safety():
+    """uninstall.ps1 应带 BOM,且不删除任何文件。"""
+    setup_dir = Path(__file__).resolve().parent.parent / "setup"
+    src = (setup_dir / "uninstall.ps1").read_text(encoding="utf-8")
+    assert src.startswith("\ufeff")
+    assert "Remove-Item" not in src and "del " not in src, "卸载脚本不应删除文件"
+
+
+def test_install_bat_ascii_and_prompt():
+    """install.bat 应全 ASCII(防 GBK 乱码),并询问命令名。"""
+    setup_dir = Path(__file__).resolve().parent.parent / "setup"
+    src = (setup_dir / "install.bat").read_text(encoding="utf-8")
+    assert src.isascii(), "install.bat 必须全 ASCII"
+    assert "set /p CMDNAME" in src
+    assert "-CmdName" in src
+    assert "pocketshell\\__main__.py" not in src, "bat 不应直接引用包路径(由 ps1 生成)"

@@ -64,17 +64,24 @@ PocketShell 是一个面向 Windows 的终端 AI 助手(shell agent),基于 Deep
 
 默认模型 `deepseek-v4-flash`,`--model deepseek-v4-pro` 可切换。
 
-## 装进 PATH:任意目录直接输 pocketshell
+## 装进 PATH:任意目录直接输命令(可自定义命令名)
 
-双击 `setup\install.bat`,把 `setup` 目录加入**当前用户**的 PATH(只改用户级注册表,不动系统 PATH),
-然后**新开一个终端**,任意目录输入:
+双击 `setup\install.bat`,它会:
+
+1. **问你想用什么命令名**(直接回车默认 `pocketshell`;想要短命令就填 `g`、`ps` 等,只允许字母/数字/`_`/`-`);
+2. 在 `setup\` 里生成对应的 `<命令名>.cmd` 入口;
+3. 把 `setup` 目录加入**当前用户**的 PATH(只改用户级注册表,不动系统 PATH)。
+
+然后**新开一个终端**,任意目录输入(以命令名 `g` 为例):
 
 ```
-pocketshell "查看当前目录"
-pocketshell --repl
+g "查看当前目录"
+g --repl
+g --chat work "继续昨天"
 ```
 
-卸载:双击 `setup\uninstall.bat`(只移除 PATH 条目,不删任何文件)。
+> 改名只需重新双击 install.bat 输入新名字(旧 `.cmd` 文件残留可手动删除)。
+> 卸载:双击 `setup\uninstall.bat`(只移除 PATH 条目,不删任何文件)。
 
 ## 目录结构(全部自包含)
 
@@ -91,9 +98,9 @@ pocketshell/
 │   ├── session.py            会话持久化 + token 预算
 │   └── config.py             配置(env > 文件 > 默认)
 ├── setup/                    安装/卸载工具(平时用不到,可整个删除)
-│   ├── install.bat / uninstall.bat
+│   ├── install.bat           双击:问命令名→生成 <名>.cmd→加入用户 PATH
+│   ├── uninstall.bat         双击:从用户 PATH 移除(不删文件)
 │   ├── install.ps1 / uninstall.ps1   (UTF-8 BOM,中文不乱码)
-│   └── agent.cmd             PATH 入口命令
 ├── tests/                    测试(可删除)
 ├── config.json               ★ 唯一配置文件(首次运行自动生成,含全部配置与注释)
 ├── sessions/                 会话历史(自动创建)

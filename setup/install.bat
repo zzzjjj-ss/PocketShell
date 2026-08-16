@@ -1,12 +1,16 @@
 @echo off
 rem ============================================================
-rem  agent - install to user PATH
-rem  Double-click to add this folder to the CURRENT USER's PATH,
-rem  then open a NEW terminal and type: agent
+rem  PocketShell - install to user PATH
+rem  Asks for a command name, generates <name>.cmd in setup\,
+rem  then adds the setup folder to the CURRENT USER's PATH.
+rem  New terminal -> type: <name> "your question"
 rem  Safe: only touches HKCU\Environment\Path (user level).
 rem ============================================================
 chcp 65001 >nul
 setlocal
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1"
+set "CMDNAME="
+set /p CMDNAME=Command name [Enter=pocketshell]:
+if "%CMDNAME%"=="" set CMDNAME=pocketshell
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1" -CmdName "%CMDNAME%"
 endlocal
 pause
