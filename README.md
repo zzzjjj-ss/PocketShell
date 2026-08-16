@@ -192,12 +192,17 @@ pocketshell/
 - 记忆外置到 `memory.txt`,按需 recall,不常驻上下文;
 - 仅 7 个轻量工具,工具 schema 本身占用的 token 远小于重型 agent。
 
-## GREEN 绿色版(内置 Python)
+## GREEN 绿色版(内置 Python,⚠️ 仅 Windows)
 
-`agent-green.zip` 内置 **Python 3.13.15**(官方 embeddable 包),机器上不需要装任何东西:
-不用装 Python、不用 pip、不写注册表、不改系统 PATH。启动用 `green.bat`。
-体积约 40MB(含 Python),换取任何 Windows 机器开箱即用。
-内置 Python 版本固定,需要新版本时重新下载本包。
+`pocketshell-green.zip` 内置 **Windows 版 Python 3.13.15**(官方 embeddable 包),
+机器上不需要装任何东西:不用装 Python、不用 pip、不写注册表、不改系统 PATH。启动用 `green.bat`。
+
+- **体积说明**:green 包约 **10.6MB(zip)/ 40MB(解压)**,比便携版(45KB)大得多——
+  因为它把整个 Python 解释器塞进去了,这是**设计使然**,体积换"零安装"。
+  便携版只需系统装有 Python 3.10+,两者功能完全一致。
+- **⚠️ 仅限 Windows**:内置的是 Windows 版 Python,Linux / macOS 请使用**便携版**
+  (`pocketshell.zip` / 源码),Linux 大多自带 Python,直接跑即可,不需要 green 包。
+- 内置 Python 版本固定,需要新版本时重新下载本包。
 
 ## 开发与测试
 
