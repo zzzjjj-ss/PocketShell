@@ -35,7 +35,12 @@ def _print_stream(chunk: str) -> None:
 
 def _accumulate_usage(total: Dict[str, int], usage: dict) -> None:
     """累加一轮底层请求的 usage 到总量（工具循环可能多轮）。"""
-    for key in ("prompt_tokens", "completion_tokens", "prompt_cache_hit_tokens", "prompt_cache_miss_tokens"):
+    total["requests"] = total.get("requests", 0) + 1
+    for key in (
+        "prompt_tokens", "completion_tokens",
+        "prompt_cache_hit_tokens", "prompt_cache_miss_tokens",
+        "est_system", "est_context", "est_new",
+    ):
         total[key] = total.get(key, 0) + int(usage.get(key) or 0)
 
 
@@ -49,17 +54,41 @@ def _print_tool_call(name: str, arguments: str) -> None:
 
 
 def _show_usage(total: Dict[str, int]) -> None:
-    """打印本次对话的 token 消耗（累计多轮请求）与缓存命中情况。"""
+    """打印本次对话的 token 消耗（累计多轮请求）与缓存命中情况。
+
+    注意"输入"是**本轮所有 API 请求的累计值**：工具循环每发一次请求
+    （含重试）都带上全部会话历史，所以输入 = 单次请求输入 × 请求次数。
+    估算拆分（est_*，本地估算非 API 精确值）展示输入构成：
+    提示词注入 + 上下文累计 + 本轮新输入 ≈ 输入总量。
+    """
     if not total.get("prompt_tokens") and not total.get("completion_tokens"):
         return
     p = total.get("prompt_tokens", 0)
     c = total.get("completion_tokens", 0)
     hit = total.get("prompt_cache_hit_tokens", 0)
     miss = total.get("prompt_cache_miss_tokens", 0)
-    line = f"⚡ tokens: 输入 {p} + 输出 {c} = {p + c}"
+    reqs = total.get("requests", 1)
+
+    parts = []
+    sys_t = total.get("est_system", 0)
+    ctx_t = total.get("est_context", 0)
+    new_t = total.get("est_new", 0)
+    if sys_t or ctx_t or new_t:
+        if sys_t:
+            parts.append(f"提示词 {sys_t}")
+        if ctx_t:
+            parts.append(f"上下文 {ctx_t}")
+        if new_t:
+            parts.append(f"本轮新 {new_t}")
+        line = f"⚡ tokens: 输入 {p} ≈ {' + '.join(parts)}(估算)+ 输出 {c}"
+    else:
+        line = f"⚡ tokens: 输入 {p} + 输出 {c}"
+    if reqs > 1:
+        line += f"（{reqs} 次请求，含工具循环）"
     if hit or miss:
         rate = hit / (hit + miss) * 100 if (hit + miss) else 0
         line += f" | 缓存命中 {hit} ({rate:.0f}%)"
+        line += f" | 未命中 {miss}"
     print(f"\n\033[90m{line}\033[0m", flush=True)
 
 

@@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 from .config import cfg
 from .tools import run_tool
+from .utils import estimate_messages_tokens, estimate_tokens
 
 API_URL = "{base}/chat/completions"
 # 工具调用消息中可能出现的角色字段（避免工具消息被误清理）
@@ -294,6 +295,28 @@ def _assistant_msg(content: Optional[str], tool_calls: List[Dict]) -> Dict:
     return msg
 
 
+def _estimate_split(messages: List[Dict]) -> Dict[str, int]:
+    """估算一份 messages 的构成：提示词注入 / 上下文累计 / 本轮新输入。
+
+    用于用量展示的拆分（本地估算，非 API 精确值）：
+    - est_system: system 提示词（隔次注入时中间轮次为 0）
+    - est_context: system 之外的历史消息（上一轮已有内容）
+    - est_new: 本轮新增内容（用户新消息 / 工具结果 / 工具调用声明）
+    三者和 ≈ estimate_messages_tokens(messages) ≈ prompt_tokens。
+    """
+    sys_tok = ctx_tok = new_tok = 0
+    for i, m in enumerate(messages):
+        role = m.get("role")
+        tok = estimate_messages_tokens([m])
+        if role == "system":
+            sys_tok += tok
+        elif i == len(messages) - 1:
+            new_tok += tok
+        else:
+            ctx_tok += tok
+    return {"est_system": sys_tok, "est_context": ctx_tok, "est_new": new_tok}
+
+
 def run_conversation(
     session,
     model: str,
@@ -316,9 +339,20 @@ def run_conversation(
     final_content = ""
 
     while True:
+        # 本轮请求的构成拆分（提示词/上下文/新输入），附在 usage 回调里一并上报
+        est = _estimate_split(messages)
+
+        def _usage_cb(u: Dict, _est: Dict = est) -> None:
+            if on_usage:
+                merged = dict(u)
+                merged["est_system"] = _est["est_system"]
+                merged["est_context"] = _est["est_context"]
+                merged["est_new"] = _est["est_new"]
+                on_usage(merged)
+
         content, tool_calls, reasoning = stream_completion(
             model, messages, tools, temperature, top_p,
-            max_tokens=max_tokens, on_chunk=on_chunk, on_usage=on_usage,
+            max_tokens=max_tokens, on_chunk=on_chunk, on_usage=_usage_cb,
         )
 
         if tool_calls:
