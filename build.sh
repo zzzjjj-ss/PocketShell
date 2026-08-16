@@ -17,7 +17,7 @@ echo "[1/3] 便携版 pocketshell.zip ..."
 find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 rm -f "$ROOT/pocketshell.zip"
 zip -r "$ROOT/pocketshell.zip" \
-    run.bat run.sh README.md LICENSE pyproject.toml pocketshell setup \
+    run.bat run.sh README.md README.en.md LICENSE pyproject.toml pocketshell setup \
     -x '*/__pycache__/*' '*.pyc' 'pocketshell/tests/*' > /dev/null
 
 echo "[2/3] 下载/解压 Windows embeddable Python 3.13.15 ..."
@@ -34,7 +34,7 @@ GREEN="$BUILD/green"
 mkdir -p "$GREEN/pocketshell" "$GREEN/setup" "$GREEN/python"
 unzip -q "$BUILD/$EMBED" -d "$GREEN/python"
 cp pocketshell/*.py "$GREEN/pocketshell/"
-cp README.md LICENSE pyproject.toml "$GREEN/"
+cp README.md README.en.md LICENSE pyproject.toml "$GREEN/"
 cp setup/install.bat setup/uninstall.bat setup/uninstall.ps1 "$GREEN/setup/"
 
 echo "[3/3] green 专用资产 + 打包 pocketshell-green.zip ..."

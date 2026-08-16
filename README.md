@@ -1,5 +1,7 @@
 # PocketShell — 口袋里的 DeepSeek 终端 AI 助手
 
+> English: [README.en.md](README.en.md)
+
 > **一个目录装下一切,不碰系统任何地方。** 解压即用、拷走即迁移,
 > 不写注册表、不碰 `%APPDATA%`、不改 PATH、零第三方依赖。
 
