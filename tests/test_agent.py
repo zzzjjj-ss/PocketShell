@@ -682,3 +682,68 @@ def test_install_bat_ascii_and_prompt():
     assert "set /p CMDNAME" in src
     assert "-CmdName" in src
     assert "pocketshell\\__main__.py" not in src, "bat 不应直接引用包路径(由 ps1 生成)"
+
+
+# ---------------- web_search: RSS 优先 + HTML 回退 ----------------
+
+RSS_SAMPLE = """<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel><title>必应: python</title>
+<item><title>Python 官网</title><link>https://www.python.org/</link><description>&lt;b&gt;Python&lt;/b&gt; 编程语言官方站点</description></item>
+<item><title>Python 下载</title><link>https://www.python.org/downloads/</link><description>下载页描述</description></item>
+</channel></rss>"""
+
+
+def test_parse_rss_results():
+    from pocketshell.tools import _parse_rss_results
+    results = _parse_rss_results(RSS_SAMPLE)
+    assert len(results) == 2
+    assert results[0]["title"] == "Python 官网"
+    assert results[0]["url"] == "https://www.python.org/"
+    # HTML 标签被剥掉
+    assert "<b>" not in results[0]["snippet"]
+    assert "Python" in results[0]["snippet"]
+
+
+def test_parse_rss_results_empty():
+    from pocketshell.tools import _parse_rss_results
+    assert _parse_rss_results("<rss><channel></channel></rss>") == []
+
+
+def test_web_search_uses_rss_first(tmp_path, monkeypatch):
+    """RSS 有结果时直接用 RSS,不请求 HTML 页。"""
+    from pocketshell import tools
+    calls = []
+    def fake_http_get(url, timeout=12, headers=None):
+        calls.append(url)
+        return RSS_SAMPLE
+    monkeypatch.setattr(tools, "http_get", fake_http_get)
+    out = tools._web_search("python")
+    assert "Python 官网" in out and "https://www.python.org/" in out
+    assert "format=rss" in calls[0], "应先请求 RSS 接口"
+    assert len(calls) == 1, "RSS 有结果时不应回退 HTML"
+
+
+def test_web_search_falls_back_to_html(tmp_path, monkeypatch):
+    """RSS 为空时回退 HTML 解析。"""
+    from pocketshell import tools
+    html = """<html><body><ol id="b_results">
+      <li class="b_algo"><h2><a href="https://example.com/x">示例标题</a></h2><p>摘要</p></li>
+    </ol></body></html>"""
+    calls = []
+    def fake_http_get(url, timeout=12, headers=None):
+        calls.append(url)
+        return html if "format=rss" not in url else "<rss><channel></channel></rss>"
+    monkeypatch.setattr(tools, "http_get", fake_http_get)
+    out = tools._web_search("python")
+    assert "示例标题" in out and "https://example.com/x" in out
+    assert len(calls) == 2, "RSS 空时应回退 HTML"
+
+
+def test_web_search_error_message(monkeypatch):
+    """RSS 与 HTML 都失败时返回错误信息。"""
+    from pocketshell import tools
+    def fake_http_get(url, timeout=12, headers=None):
+        raise TimeoutError("timeout")
+    monkeypatch.setattr(tools, "http_get", fake_http_get)
+    out = tools._web_search("python")
+    assert "搜索出错" in out and "timeout" in out

@@ -194,24 +194,61 @@ class _BingParser(HTMLParser):
             self._current["snippet"] += data.strip()
 
 
-def _web_search(query: str) -> str:
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        from urllib.parse import urlencode
+def _parse_rss_results(rss_text: str, limit: int = 5) -> List[Dict[str, str]]:
+    """解析 Bing RSS(格式稳定,不依赖 HTML 结构)。返回 [{title,url,snippet}]。"""
+    from xml.etree import ElementTree as ET
 
+    root = ET.fromstring(rss_text)
+    results = []
+    for item in root.findall(".//item"):
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        desc = (item.findtext("description") or "").strip()
+        desc = re.sub(r"<[^>]+>", " ", desc)  # description 常为 HTML 片段
+        desc = re.sub(r"\s+", " ", desc).strip()
+        if title or link:
+            results.append({"title": title, "url": link, "snippet": desc})
+        if len(results) >= limit:
+            break
+    return results
+
+
+def _format_results(results: List[Dict[str, str]]) -> str:
+    if not results:
+        return "未找到搜索结果。"
+    lines = []
+    for i, r in enumerate(results, 1):
+        lines.append(f"{i}. {r['title']}\n   {r['url']}\n   {r['snippet'][:200]}")
+    return "\n\n".join(lines)
+
+
+def _web_search(query: str) -> str:
+    """Bing 搜索。优先 RSS 接口(结构稳定)；RSS 失败/为空时回退 HTML 解析。"""
+    from urllib.parse import urlencode
+
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    try:
+        rss = http_get(
+            "https://www.bing.com/search?" + urlencode({"q": query, "format": "rss"}),
+            timeout=12,
+            headers=headers,
+        )
+        results = _parse_rss_results(rss)
+        if results:
+            return _format_results(results)
+    except Exception:
+        pass  # RSS 不可用,回退 HTML
+
+    # 回退:HTML 页面解析(旧逻辑)
+    try:
         text = http_get(
             "https://www.bing.com/search?" + urlencode({"q": query, "setlang": "zh-hans"}),
             timeout=12,
             headers=headers,
         )
         parser = _BingParser()
-        results = parser.results[:5]
-        if not results:
-            return "未找到搜索结果。"
-        lines = []
-        for i, r in enumerate(results, 1):
-            lines.append(f"{i}. {r['title']}\n   {r['url']}\n   {r['snippet'][:200]}")
-        return "\n\n".join(lines)
+        parser.feed(text)
+        return _format_results(parser.results[:5])
     except Exception as e:
         return f"搜索出错：{e}"
 
