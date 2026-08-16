@@ -91,7 +91,7 @@ CONFIRM_RULES: List[tuple] = [
     (r"\bmsiexec\b[^\n]*/uninstall\b|\buninstall\b", "卸载程序指令"),
     (r"\bSet-ExecutionPolicy\b", "修改 PowerShell 执行策略"),
     (r"\breg\s+add\b", "修改注册表指令"),
-    (r"\bformat\b", "格式化相关指令（非删除匹配兜底）"),
+    (r"\bformat\b(?![-_](?!volume)[A-Za-z])", "格式化相关指令（非删除匹配兜底）"),
     (r"\bStart-Process\b|\bInvoke-Item\b", "启动程序/打开文件指令"),
     (r"\bmklink\b|\bNew-Item\b[^\n]*-ItemType\s+SymbolicLink", "创建符号链接指令"),
     (r"\b(?:pip|npm|gem|apt|winget|choco)\s+uninstall\b", "卸载软件包指令"),
