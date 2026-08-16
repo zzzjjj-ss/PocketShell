@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """命令安全层：代码级硬拦截，不依赖模型自觉。
 
 分级判定：

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """DeepSeek API 客户端：流式对话 + 工具调用循环。
 
 - 纯标准库 urllib 调 OpenAI 兼容 /chat/completions 接口（零第三方依赖，体积小）。

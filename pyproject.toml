@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Portable DeepSeek terminal AI assistant in one folder - zero install, zero dependency, hard deletion guard"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MPL-2.0"
 keywords = ["deepseek", "cli", "agent", "shell", "portable", "windows"]
 classifiers = [
     "Programming Language :: Python :: 3",

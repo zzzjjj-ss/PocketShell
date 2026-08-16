@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """终端彩色 Markdown 渲染（纯标准库，无第三方依赖）。
 
 - enable_ansi()   ：Windows 下通过 ctypes 启用 VT 转义序列（cmd/PowerShell 均可）。

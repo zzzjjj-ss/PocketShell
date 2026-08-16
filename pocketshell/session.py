@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """会话管理：UTF-8 JSON 持久化 + 工具消息清理 + token 预算截断（省 token 核心）。
 
 会话文件位于 agent 目录下 sessions/<name>.json（便携：拷走整个 agent 目录即迁移）。

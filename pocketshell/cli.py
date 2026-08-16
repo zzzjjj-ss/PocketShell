@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """命令行入口：默认常驻对话 / REPL 连续对话 / --chat 多会话。
 
 用法示例：

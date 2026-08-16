@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """通用工具：Windows 检测、shell 识别、token 估算、文本截断、标准库 HTTP。"""
 
 from __future__ import annotations

@@ -223,4 +223,4 @@ HOME=$(mktemp -d) python3 -m pytest tests/ -q
 
 ## License
 
-MIT
+[Mozilla Public License Version 2.0](LICENSE)

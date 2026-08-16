@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """配置加载：优先级 环境变量 > config.json > 内置默认值。
 
 设计原则（零安装、便携）：

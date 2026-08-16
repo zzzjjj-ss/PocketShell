@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """冒烟测试：safety 拦截规则、会话 token 截断、工具执行、API 工具循环(mock)。
 
 运行：cd /home/zhang/sgpt && HOME=/tmp/sgpt_test_home PYTHONPATH=/tmp/pip_site python3 -m pytest agent/tests/ -q

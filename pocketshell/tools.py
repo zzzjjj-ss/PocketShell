@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """工具定义与执行：execute_shell / remember / recall / fetch_url / web_search。
 
 每个工具 = {"name", "description", "parameters"(JSON Schema), "handler"(callable)}

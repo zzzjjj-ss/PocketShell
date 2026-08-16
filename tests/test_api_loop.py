@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """工具调用循环的 mock 测试：模拟 DeepSeek SSE 流，验证
 一轮工具调用（assistant tool_calls → tool 结果 → 继续请求 → 最终文本）。
 
