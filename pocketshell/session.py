@@ -20,7 +20,7 @@ from .config import AGENT_DIR, cfg
 from .utils import estimate_messages_tokens
 
 SESSIONS_DIR = Path(
-    os.environ.get("PS_SESSIONS_DIR", os.environ.get("SGPT_SESSIONS_DIR", str(AGENT_DIR / "sessions")))
+    os.environ.get("PS_SESSIONS_DIR", str(AGENT_DIR / "sessions"))
 )
 
 

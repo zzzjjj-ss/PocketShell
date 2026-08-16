@@ -173,7 +173,7 @@ pocketshell/
 }
 ```
 
-- **优先级**:环境变量 > config.json > 内置默认;环境变量用 `PS_`+键名(如 `PS_CONTEXT_TOKEN_BUDGET`;旧前缀 `SGPT_*` 仍兼容)
+- **优先级**:环境变量 > config.json > 内置默认;环境变量用 `PS_`+键名(如 `PS_CONTEXT_TOKEN_BUDGET`)
 - **生效时机**:修改后重启;命令行参数(`--model`/`--temperature`/`--max-output` 等)临时覆盖配置
 - **路径项留空**:自动落在项目目录内(`sessions/`、`memory.txt`),拷走目录即迁移
 

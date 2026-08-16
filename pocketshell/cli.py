@@ -186,7 +186,7 @@ def _doctor() -> int:
         except OSError as e:
             print(f"  读取失败: {e}")
     print("环境变量:")
-    for name in ("OPENAI_API_KEY", "PS_API_KEY", "SGPT_API_KEY"):
+    for name in ("OPENAI_API_KEY", "PS_API_KEY"):
         val = os.environ.get(name, "")
         print(f"  {name}: {'<已设置>' if val else '<未设置>'}")
     try:

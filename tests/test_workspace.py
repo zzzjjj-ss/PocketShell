@@ -222,26 +222,31 @@ def test_cwd_prefix_change_forces_system_injection(tmp_path, monkeypatch):
     assert str(parent) in s.messages[0]["content"]  # 旧逻辑:父目录是子串 -> 漏检
 
 
-# ---------------- 环境变量前缀:PS_ 新名 / SGPT_ 旧名兼容 ----------------
+# ---------------- 环境变量前缀:PS_ 新名(SGPT_ 旧名已移除) ----------------
 
-def test_env_prefix_ps_preferred_over_sgpt(monkeypatch):
+def test_env_prefix_ps_reads(monkeypatch):
     from pocketshell.config import Config
     monkeypatch.setenv("PS_CONTEXT_TOKEN_BUDGET", "111")
-    monkeypatch.setenv("SGPT_CONTEXT_TOKEN_BUDGET", "222")
     assert Config().get("CONTEXT_TOKEN_BUDGET") == "111"
 
 
-def test_env_prefix_sgpt_compat(monkeypatch):
+def test_env_prefix_sgpt_no_longer_read(monkeypatch):
+    """旧前缀 SGPT_* 已删除：设置它不应影响配置读取。"""
     from pocketshell.config import Config
     monkeypatch.delenv("PS_CONTEXT_TOKEN_BUDGET", raising=False)
     monkeypatch.setenv("SGPT_CONTEXT_TOKEN_BUDGET", "222")
-    assert Config().get("CONTEXT_TOKEN_BUDGET") == "222"
+    c = Config()
+    # 不读 SGPT_ 前缀 → 回落默认 65536
+    assert c.get("CONTEXT_TOKEN_BUDGET") == c._defaults["CONTEXT_TOKEN_BUDGET"]
 
 
-def test_api_key_env_ps_and_sgpt(monkeypatch):
+def test_api_key_env_ps_only(monkeypatch):
     from pocketshell.config import Config
     monkeypatch.setenv("PS_API_KEY", "sk-ps")
     monkeypatch.setenv("SGPT_API_KEY", "sk-sgpt")
     assert Config().get_api_key() == "sk-ps"
     monkeypatch.delenv("PS_API_KEY")
-    assert Config().get_api_key() == "sk-sgpt"
+    monkeypatch.delenv("SGPT_API_KEY")
+    import pytest as _pytest
+    with _pytest.raises(RuntimeError):
+        Config().get_api_key()  # SGPT_API_KEY 不再生效

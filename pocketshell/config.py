@@ -8,7 +8,7 @@
 - 不阻塞：首次运行绝不交互式询问（getpass），API Key 缺失时给出明确报错与获取链接。
 
 环境变量命名规则：PS_ + 配置键名（如 CONTEXT_TOKEN_BUDGET → PS_CONTEXT_TOKEN_BUDGET）；
-旧前缀 SGPT_*（shell-gpt 遗产）继续兼容；另有裸键别名 OPENAI_API_KEY / PS_API_KEY 均可设置 API Key。
+另有裸键别名 OPENAI_API_KEY / PS_API_KEY 均可设置 API Key。
 """
 
 from __future__ import annotations
@@ -27,11 +27,10 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 # agent 包所在目录（程序文件；自毁防护保护整个 ROOT_DIR）
 AGENT_DIR = Path(__file__).resolve().parent
 
-CONFIG_PATH = Path(os.environ.get("PS_CONFIG_PATH", os.environ.get("SGPT_CONFIG_PATH", ROOT_DIR / "config.json")))
+CONFIG_PATH = Path(os.environ.get("PS_CONFIG_PATH", ROOT_DIR / "config.json"))
 
-# 环境变量前缀：新名 PS_（PocketShell）优先，旧名 SGPT_（shell-gpt 遗产）兼容。
-# 老用户已设置 SGPT_* 的无需改动，新文档一律用 PS_。
-_ENV_PREFIXES = ("PS_", "SGPT_")
+# 环境变量前缀：PS_（PocketShell）。旧前缀 SGPT_（shell-gpt 遗产）已移除。
+_ENV_PREFIX = "PS_"
 
 # 内置默认值（均为字符串，与配置文件的键值格式一致）
 # 注意：这里只放常量默认值；环境变量由 Config.get 每次实时读取（优先于本表）。
@@ -171,11 +170,10 @@ class Config:
             self._read()
 
     def get(self, key: str) -> str:
-        # 环境变量优先：裸键（OPENAI_API_KEY）与 PS_/SGPT_+键名 均可
-        for prefix in _ENV_PREFIXES:
-            env_value = os.environ.get(prefix + key)
-            if env_value is not None:
-                return env_value
+        # 环境变量优先：PS_+键名 或裸键（OPENAI_API_KEY）
+        env_value = os.environ.get(_ENV_PREFIX + key)
+        if env_value is not None:
+            return env_value
         env_value = os.environ.get(key)
         if env_value is not None:
             return env_value
@@ -198,14 +196,8 @@ class Config:
             return fallback
 
     def get_api_key(self) -> str:
-        # 兼容多种来源：裸键 OPENAI_API_KEY、PS_OPENAI_API_KEY、SGPT_OPENAI_API_KEY、
-        # PS_API_KEY、SGPT_API_KEY（新前缀优先）
-        key = ""
-        for name in ("PS_API_KEY", "SGPT_API_KEY"):
-            v = os.environ.get(name, "").strip()
-            if v:
-                key = v
-                break
+        # 兼容来源：裸键 OPENAI_API_KEY、PS_API_KEY（环境变量）
+        key = os.environ.get("PS_API_KEY", "").strip()
         if not key:
             key = self.get("OPENAI_API_KEY").strip()
         if not key:
@@ -236,8 +228,8 @@ _CONFIG_TEMPLATE = """{
   // ============ agent 配置文件（config.json） ============
   // 优先级：环境变量 > 本文件 > 内置默认值。
   // 环境变量规则：PS_ + 键名（如 CONTEXT_TOKEN_BUDGET → PS_CONTEXT_TOKEN_BUDGET）。
-  // 旧前缀 SGPT_* 仍兼容；修改后重启 agent 生效；注释请独占一行（行内 // 会被当作注释内容删除）。
-  // API Key 也可用环境变量 PS_API_KEY / SGPT_API_KEY 或 OPENAI_API_KEY 设置。
+  // 修改后重启 agent 生效；注释请独占一行（行内 // 会被当作注释内容删除）。
+  // API Key 也可用环境变量 PS_API_KEY 或 OPENAI_API_KEY 设置。
 
   // ---------- 模型与 API ----------
   // 默认模型：deepseek-v4-flash（快） / deepseek-v4-pro（强）

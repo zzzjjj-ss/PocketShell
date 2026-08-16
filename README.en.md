@@ -181,7 +181,7 @@ Supports `//` comments, editable in VS Code:
 ```
 
 - **Precedence**: env var > config.json > built-in default; env vars use `PS_`+key
-  (e.g. `PS_CONTEXT_TOKEN_BUDGET`; legacy `SGPT_*` prefix still works)
+  (e.g. `PS_CONTEXT_TOKEN_BUDGET`)
 - **When it takes effect**: restart; CLI flags (`--model`/`--temperature`/`--max-output` etc.)
   override config for that run
 
