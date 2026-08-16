@@ -114,9 +114,25 @@ class Session:
     def add_tool_result(self, tool_call_id: str, content: str) -> None:
         self.add({"role": "tool", "content": content, "tool_call_id": tool_call_id})
 
-    def messages_for_api(self) -> List[Dict]:
-        """返回发送给 API 的消息：清理 + 按 token 预算截断。"""
+    def messages_for_api(self, force_system: bool = False) -> List[Dict]:
+        """返回发送给 API 的消息：清理 + 按 token 预算截断 + system 注入频率控制。
+
+        force_system=True 时本次请求强制包含 system 提示词（cwd 变化等场景）。
+        注入频率由 SYSTEM_PROMPT_INTERVAL 控制：system 提示词已在上文出现过时，
+        中间轮次不再重复发送，利用上下文缓存省 token（首轮总是注入）。
+        """
         msgs = clean_tool_messages(self.messages)
+
+        # system 注入频率：统计 user 消息条数作为"轮次"
+        interval = cfg.get_int("SYSTEM_PROMPT_INTERVAL", 3)
+        user_count = sum(1 for m in msgs if m.get("role") == "user")
+        has_system = bool(msgs) and msgs[0].get("role") == "system"
+        # 首轮（第一条 user）或每 interval 轮注入一次，或强制注入
+        if not force_system and has_system and interval > 1 and user_count > 1:
+            inject = (user_count - 1) % interval == 0
+            if not inject:
+                msgs = [m for m in msgs if m.get("role") != "system"]
+
         budget = cfg.get_int("CONTEXT_TOKEN_BUDGET", 16000)
         while msgs and estimate_messages_tokens(msgs) > budget and len(msgs) > 1:
             # 丢弃最旧的非 system 消息

@@ -77,10 +77,13 @@ def _run_turn(
 
     # system 提示词含"当前工作目录"：每次提问前刷新，目录变化后模型不会用过时的 cwd
     system_text = make_system_prompt()
+    force_system = False
     if not session.messages or session.messages[0].get("role") != "system":
         session.system(system_text)
+        force_system = True  # 首轮必注入
     elif _os.getcwd() not in session.messages[0].get("content", ""):
         session.messages[0]["content"] = system_text
+        force_system = True  # cwd 变化：本轮强制注入最新 system
     session.add_user(prompt)
     tools = get_tool_schemas() if use_tools else None
     print(f"\n\033[90m[会话: {session.name}] 提问: {prompt}\033[0m" if not sys.stdout.isatty() else "", end="")
@@ -96,6 +99,7 @@ def _run_turn(
         on_chunk=_print_stream,
         on_tool=_print_tool_call,
         on_usage=lambda u: _accumulate_usage(usage_total, u),
+        force_system=force_system,
     )
     if show_usage:
         _show_usage(usage_total)
@@ -213,6 +217,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--clear", metavar="NAME", help="删除会话")
     parser.add_argument("--doctor", action="store_true", help="配置健康检查（诊断 API Key 读取问题）")
     parser.add_argument("--version", action="store_true", help="显示版本")
+    parser.add_argument("-setworkspace", "--setworkspace", nargs="?", const="__CWD__", metavar="DIR",
+                        help="把 DIR（默认当前目录）设为工作目录：其内写文件免确认，删除仍硬拦；"
+                             "传 off 关闭。仅本次运行生效，关闭窗口或 cd 离开后自动失效")
     args = parser.parse_args(argv)
 
     if args.version:
@@ -227,6 +234,25 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.doctor:
         return _doctor()
+
+    # -setworkspace：设定工作目录（仅本次运行生效；内存态，不落盘）
+    if args.setworkspace is not None:
+        import os as _os
+        from .safety import set_workspace
+
+        if str(args.setworkspace).lower() in ("off", "none"):
+            set_workspace(None)
+            print("已关闭工作目录授权。")
+            return 0
+        if args.setworkspace == "__CWD__":
+            path = _os.getcwd()
+        else:
+            path = args.setworkspace
+        ws = set_workspace(path)
+        print(f"已设置工作目录: {ws}")
+        print("说明: 该目录内写文件免确认；删除/格式化等破坏性操作仍被硬拦截；")
+        print("      关闭窗口或 cd 离开后授权自动失效，需重新设置。")
+        return 0
 
     if args.list_chats:
         _list_chats()
@@ -282,6 +308,22 @@ def main(argv: Optional[List[str]] = None) -> int:
                     session.reset()
                     session.ensure_system(make_system_prompt())
                     print("已清空当前会话上下文。")
+                    continue
+                if user_input.lower().startswith("/setworkspace"):
+                    import os as _os
+                    from .safety import set_workspace, get_workspace
+
+                    rest = user_input[len("/setworkspace"):].strip()
+                    if rest.lower() in ("off", "none"):
+                        set_workspace(None)
+                        print("已关闭工作目录授权。")
+                    elif rest:
+                        ws = set_workspace(rest)
+                        print(f"已设置工作目录: {ws}")
+                    else:
+                        ws = set_workspace(_os.getcwd())
+                        print(f"已设置工作目录: {ws}")
+                    print("（该目录内写文件免确认，删除仍硬拦；关闭窗口或 cd 离开后失效）")
                     continue
                 _run_turn(session, user_input, model, temperature, top_p, use_tools, max_tokens, show_usage)
                 print()

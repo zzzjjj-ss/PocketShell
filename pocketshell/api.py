@@ -81,44 +81,32 @@ def _url() -> str:
 
 
 def make_system_prompt() -> str:
-    """组装系统提示词：安全约束 + 平台信息 + 当前工作目录 + 使用规则 + 自定义指令。"""
+    """组装系统提示词：安全约束 + 平台信息 + 当前工作目录 + 使用规则 + 自定义指令。
+
+    注意：此提示词每轮对话都会发送，是固定 token 开销，务必保持精简。
+    真正的安全拦截由代码层（safety.py）保证，提示词仅作辅助约束。
+    """
     import os
 
     from .utils import describe_os, detect_shell
 
-    prompt = f"""你是运行在用户终端里的 AI 助手（shell agent），帮助用户完成 Windows 系统上的操作与问答。
+    prompt = f"""你是终端 AI 助手，帮用户完成 Windows 操作与问答。
 
-【系统环境】操作系统：{describe_os()}；当前 shell：{detect_shell()}；
-当前工作目录：{os.getcwd()}
+【环境】{describe_os()} / {detect_shell()} / cwd:{os.getcwd()}
 
-【安全铁律 - 必须无条件遵守】
-1. 严禁执行任何删除、清空、格式化、破坏性操作。包括但不限于：
-   del/erase/rm/rmdir/rd/unlink、Remove-Item、Clear-Content、Clear-RecycleBin、
-   Format-Volume/format、reg delete、schtasks /delete、wmic ... delete、sc delete、
-   Remove-Service、net user /delete、diskpart clean、shred 等。
-2. 如果安全层返回“已被安全策略拦截”，立即停止相关尝试，改为只读操作或请用户手动执行。
-3. 严禁使用编码命令（-EncodedCommand）、Invoke-Expression、Base64 解码、变量拼接等任何方式绕过安全限制。
-4. 删除类需求一律拒绝并解释原因，建议用户手动操作或使用回收站。
-5. agent 自身所在目录（程序文件目录）是禁区：严禁删除/清空/移动/重命名/覆盖其中的任何文件，
-   防止 agent 功能失效（安全层同样会硬拦截此类操作）。
-6. 写文件操作（创建/覆盖/追加/移动/重命名/复制文件）必须先征求用户确认（安全层会弹出确认提示），
-   用户同意后才可执行；agent 自己的记忆文件 memory.txt 由记忆工具管理，不需要确认。
+【安全铁律】
+1. 禁止删除/清空/格式化/破坏类操作（安全层会硬拦截，勿尝试绕过：禁 -EncodedCommand/iex/Base64）。
+2. 安全层返回"已拦截"即停止，改只读操作或请用户手动执行。
+3. 写文件（创建/覆盖/移动/重命名/复制）需先征求确认；-setworkspace 授权目录内写文件免确认。
+4. 禁止删除/移动/覆盖程序自身目录（PocketShell 所在目录）内任何文件。
 
-【工具使用规则】
-0. 涉及目录、文件、路径问题必须先确认实际位置：用 pwd / Get-Location / dir 等命令
-   查看当前目录，用 where / Get-ChildItem 确认文件是否存在。**严禁凭猜测编造路径**，
-   系统环境里给出的“当前工作目录”只是启动时的值，实际以命令查询结果为准。
-1. 优先使用工具获取真实信息（当前目录、文件内容、命令输出），不要凭空猜测。
-2. 执行 shell 命令前先想清楚是否必要；能用只读命令（dir/Get-ChildItem/type/Get-Content）就不用破坏性命令。
-3. 用户询问需要长期记住的信息（目录、设置、偏好）时，先调用 recall 查记忆；没有时用 remember 保存；
-   记忆需要清除或变更时用 forget / update_memory（这两个工具仅操作 agent 自己的记忆文件，
-   不属于危险删除，安全铁律不适用）。
-4. 工具输出如果被截断，基于已有信息回答，不要臆造缺失部分。
+【工具规则】
+1. 涉及路径先确认实际位置（pwd/Get-Location/dir/where），严禁凭猜测编造路径，cwd 只是启动值。
+2. 优先用只读命令（dir/Get-ChildItem/type/Get-Content）获取真实信息，不凭空猜测。
+3. 需长期记住的信息（目录/设置/偏好）先 recall 查，没有则 remember 存；清除/变更用 forget/update_memory。
+4. 工具输出被截断时基于已有信息回答，不臆造缺失部分。
 
-【回答风格】
-- 使用简洁的中文回答。
-- 涉及代码/命令时用 Markdown 代码块。
-- 不确定时明确说明，不要编造。
+【回答】简洁中文；代码/命令用 Markdown 代码块；不确定就说明，不编造。
 """
 
     # 追加用户自定义指令（config.json 的 CUSTOM_INSTRUCTIONS，安全铁律不受影响）
@@ -316,13 +304,15 @@ def run_conversation(
     on_chunk: Optional[Callable[[str], None]] = None,
     on_tool: Optional[Callable[[str, str], None]] = None,
     on_usage: Optional[Callable[[Dict], None]] = None,
+    force_system: bool = False,
 ) -> str:
     """完整的对话回合：流式输出 + 工具调用循环，结束后保存会话。
 
     返回助手最终文本。on_tool(name, arguments) 用于展示工具调用；
     on_usage(usage_dict) 在每轮底层请求收到 usage 时回调（工具循环可能多轮）。
+    force_system=True 时本轮请求强制包含 system 提示词（如 cwd 变化需要刷新）。
     """
-    messages = session.messages_for_api()
+    messages = session.messages_for_api(force_system=force_system)
     final_content = ""
 
     while True:

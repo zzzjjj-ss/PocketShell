@@ -289,3 +289,158 @@ def confirm_prompt(command: str, reason: str) -> str:
         f"  {command}\n"
         "输入 y 执行，其它任意输入取消: "
     )
+
+
+# ---------------------------------------------------------------------------
+# 工作目录授权（-setworkspace）
+#
+# 设计（见 IDEAS.md）：
+# - WORKSPACE_DIR 只存内存/会话，不写进持久 config.json —— 关闭 cmd 窗口即失效。
+# - 每次判断前校验 os.getcwd() 仍等于 WORKSPACE_DIR；用户 cd 离开即视为未授权，
+#   回到目录也需重新授权。
+# - 授权语义：工作目录内的“写操作”（新建/覆盖/追加/移动/重命名/复制）自动放行；
+#   删除类操作仍由 BLOCK 规则硬拦，绝不因 workspace 放行。
+# ---------------------------------------------------------------------------
+
+WORKSPACE_DIR: Optional[str] = None
+
+
+def set_workspace(path: Optional[str]) -> Optional[str]:
+    """设置工作目录（仅内存，不落盘）。path 为 None / 'off' / 空串时清除。
+
+    返回生效的绝对路径；清除时返回 None。
+    """
+    global WORKSPACE_DIR
+    if not path or str(path).strip().lower() in ("off", "none"):
+        WORKSPACE_DIR = None
+        return None
+    WORKSPACE_DIR = os.path.realpath(os.path.abspath(os.path.expanduser(str(path).strip())))
+    return WORKSPACE_DIR
+
+
+def get_workspace() -> Optional[str]:
+    """返回当前生效的工作目录；若已 cd 离开则清除并返回 None（需重新授权）。"""
+    global WORKSPACE_DIR
+    if not WORKSPACE_DIR:
+        return None
+    try:
+        if os.path.realpath(os.getcwd()) != WORKSPACE_DIR:
+            WORKSPACE_DIR = None  # 用户已离开 → 授权立即失效
+            return None
+    except OSError:
+        WORKSPACE_DIR = None
+        return None
+    return WORKSPACE_DIR
+
+
+def is_workspace_active() -> bool:
+    """当前是否有生效的工作目录（且 cwd 未离开）。"""
+    return get_workspace() is not None
+
+
+_WIN_ABS = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _path_is_within(path: str, workspace: str) -> bool:
+    """path（解析后）是否等于或在 workspace 内。
+
+    兼容 Windows 盘符路径：目标为 X:\\... 而 workspace 不是同盘符时直接判外
+    （在非 Windows 环境也能正确判断盘符路径逃逸）。
+    """
+    raw = str(path).strip()
+    try:
+        p = os.path.realpath(os.path.abspath(os.path.expanduser(raw)))
+        w = os.path.realpath(workspace)
+    except (OSError, ValueError):
+        return False
+    # Windows 绝对路径（盘符）与 workspace 盘符不一致 → 判外
+    if _WIN_ABS.match(raw):
+        wm = _WIN_ABS.match(w)
+        if not wm or wm.group(0)[:1].upper() != raw[:1].upper():
+            return False
+    if p == w:
+        return True
+    return p.startswith(w + os.sep)
+
+
+# PowerShell 写类 cmdlet：目标路径在 cmdlet 名后（-Path/-LiteralPath 或首个位置参数）
+_WRITE_CMDLETS = [
+    ("Set-Content", "-Path|-LiteralPath"),
+    ("Add-Content", "-Path|-LiteralPath"),
+    ("Out-File", "-FilePath"),
+    ("New-Item", "-Path"),
+    ("Copy-Item", "-Destination|-Path"),
+    ("Move-Item", "-Destination|-Path"),
+    ("Rename-Item", "-NewName|-Path"),
+]
+
+
+def _cmdlet_write_target(cmd: str) -> Optional[str]:
+    """尝试从 PowerShell 写类 cmdlet 命令中提取目标路径（未解析的原始文本）。"""
+    for name, flag_alt in _WRITE_CMDLETS:
+        m = re.search(rf"\b{name}\b", cmd, re.IGNORECASE)
+        if not m:
+            continue
+        head = cmd[m.end():]
+        # 1) 带 -Path/-Destination/-NewName 等显式参数（flag 本身含 '-'）
+        for flag in flag_alt.split("|"):
+            fm = re.search(
+                rf"{flag}\s+([\"'][^\"']+[\"']|[^\s\"';|&]+)", head, re.IGNORECASE
+            )
+            if fm:
+                return fm.group(1).strip().strip("\"'")
+        # 2) 位置参数（Copy/Move 的目标为最后一个位置参数）
+        positional = []
+        for pm in re.finditer(r"([\"'][^\"']+[\"']|[^\s\"';|&]+)", head):
+            tok = pm.group(1).strip()
+            if tok.startswith("-") and not _looks_like_path(tok):
+                break  # 开关参数开始,后续位置参数归它
+            if _looks_like_path(tok):
+                positional.append(tok.strip("\"'"))
+        if positional:
+            return positional[-1]
+        return None
+    return None
+
+
+def _looks_like_path(tok: str) -> bool:
+    """粗略判断 token 是否像路径（含分隔符/扩展名/通配符/反斜杠）。"""
+    return (
+        "/" in tok or "\\" in tok or "." in tok or "*" in tok or "?" in tok
+    )
+
+
+def extract_write_target(command: str) -> Optional[str]:
+    """从命令中提取写操作的目标路径（原始文本，未解析）。
+
+    支持：cmd 重定向 >/>> 、PowerShell Set-Content/Add-Content/Out-File/
+    New-Item/Copy-Item/Move-Item/Rename-Item。解析不到返回 None。
+    """
+    if not command:
+        return None
+    cmd = command.strip()
+    # 1) PowerShell 写类 cmdlet
+    t = _cmdlet_write_target(cmd)
+    if t:
+        return t
+    # 2) cmd/bash 重定向 > 或 >>（排除 2>&1、>=、2> 等）
+    m = re.search(r"(?<![12&])(?<![\d])(?:>>|>)\s*[\"']?([^\"'\s|;&<>]+)", cmd)
+    if m:
+        return m.group(1).strip().strip("\"'")
+    return None
+
+
+def is_workspace_write(command: str) -> bool:
+    """命令是否为「在工作目录内写文件」。
+
+    是 → 调用方（工具层）可跳过 FILE_WRITE_CONFIRM 确认。
+    删除类命令不会走到这里（上层 BLOCK 已拦截）。
+    """
+    ws = get_workspace()
+    if not ws:
+        return False
+    target = extract_write_target(command)
+    if not target:
+        return False
+    return _path_is_within(target, ws)
+

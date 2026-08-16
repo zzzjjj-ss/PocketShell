@@ -267,7 +267,12 @@ def _execute_shell(shell_command: str) -> str:
         # 写文件操作（创建/覆盖/移动/重命名/复制）受 FILE_WRITE_CONFIRM 独立开关控制；
         # 其它高危操作受 CONFIRM_DANGEROUS 控制。记忆文件 memory.txt 由记忆工具直接管理，不经过这里。
         if result.category == "write":
-            need_confirm = cfg.get_bool("FILE_WRITE_CONFIRM", True)
+            # 工作目录授权：命令目标在当前授权的工作目录内 → 免确认直接执行
+            # （删除类仍被 BLOCK 硬拦，不会走到这里）
+            if safety.is_workspace_write(shell_command):
+                need_confirm = False
+            else:
+                need_confirm = cfg.get_bool("FILE_WRITE_CONFIRM", True)
         else:
             need_confirm = cfg.get_bool("CONFIRM_DANGEROUS", True)
         if need_confirm:

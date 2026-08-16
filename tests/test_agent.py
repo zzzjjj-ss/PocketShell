@@ -530,7 +530,7 @@ def test_custom_instructions_appended(monkeypatch):
     # 安全铁律仍在（追加不覆盖）
     assert "安全铁律" in prompt
     # 自定义指令在末尾
-    assert prompt.index("【用户自定义指令】") > prompt.index("【回答风格】")
+    assert prompt.index("【用户自定义指令】") > prompt.index("【回答】")
 
 
 def test_custom_instructions_empty(monkeypatch):
