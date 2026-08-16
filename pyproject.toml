@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pocketshell"
+version = "0.1.0"
+description = "Portable DeepSeek terminal AI assistant in one folder - zero install, zero dependency, hard deletion guard"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["deepseek", "cli", "agent", "shell", "portable", "windows"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+pocketshell = "pocketshell.cli:main"
+
+[tool.setuptools]
+packages = ["pocketshell"]
