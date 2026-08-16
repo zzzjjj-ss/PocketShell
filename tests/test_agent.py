@@ -399,8 +399,9 @@ def test_migrate_old_sgptrc_key(tmp_path, monkeypatch):
     """旧版 config/.sgptrc 的 API Key 应迁移进 config.json，旧文件被清理。"""
     from pocketshell import config as config_mod
 
-    # 造一个旧版目录结构
-    old_dir = config_mod.AGENT_DIR / "config"
+    # 旧版目录结构在项目根下；mock ROOT_DIR 避免污染真实仓库
+    monkeypatch.setattr(config_mod, "ROOT_DIR", tmp_path)
+    old_dir = config_mod.ROOT_DIR / "config"
     old_dir.mkdir(parents=True, exist_ok=True)
     old_file = old_dir / ".sgptrc"
     old_file.write_text(
@@ -464,7 +465,7 @@ def test_self_dir_delete_blocked():
     from pocketshell.config import AGENT_DIR
     result = safety.analyze_command(f'Remove-Item "{AGENT_DIR}\\api.py" -Force')
     assert result.verdict == safety.BLOCK
-    assert "agent 自身目录" in result.reason
+    assert "项目目录" in result.reason
 
 
 def test_self_dir_rm_rf_blocked():
@@ -472,7 +473,7 @@ def test_self_dir_rm_rf_blocked():
     from pocketshell.config import AGENT_DIR
     result = safety.analyze_command(f"rm -rf {AGENT_DIR}")
     assert result.verdict == safety.BLOCK
-    assert "agent 自身目录" in result.reason
+    assert "项目目录" in result.reason
 
 
 def test_self_dir_cwd_delete_blocked():
@@ -480,7 +481,7 @@ def test_self_dir_cwd_delete_blocked():
     from pocketshell.config import AGENT_DIR
     result = safety.analyze_command("Remove-Item * -Recurse", cwd=str(AGENT_DIR))
     assert result.verdict == safety.BLOCK
-    assert "agent 自身目录" in result.reason
+    assert "项目目录" in result.reason
 
 
 def test_self_dir_rename_blocked():
@@ -490,7 +491,7 @@ def test_self_dir_rename_blocked():
         f'Rename-Item "{AGENT_DIR}\\__main__.py" "main.py"', cwd=str(AGENT_DIR)
     )
     assert result.verdict == safety.BLOCK
-    assert "agent 自身目录" in result.reason
+    assert "项目目录" in result.reason
 
 
 def test_self_dir_overwrite_blocked():
@@ -551,29 +552,29 @@ def test_custom_instructions_empty(monkeypatch):
     'Rename-Item a.txt b.txt',
     'copy a.txt b.txt',
 ])
-def test_write_operation_is_confirm(cmd):
+def test_write_operation_is_confirm(cmd, tmp_path):
     """写文件操作 → CONFIRM 且 category=write（需用户确认）。"""
-    result = safety.analyze_command(cmd, cwd="C:\\work")
+    result = safety.analyze_command(cmd, cwd=str(tmp_path))
     assert result.verdict == safety.CONFIRM
     assert result.category == "write"
     assert "写文件操作" in result.reason
 
 
-def test_write_redirect_excludes_stderr():
+def test_write_redirect_excludes_stderr(tmp_path):
     """2>&1 是错误重定向不是写文件 → 不触发写确认。"""
-    result = safety.analyze_command("dir 2>&1", cwd="C:\\work")
+    result = safety.analyze_command("dir 2>&1", cwd=str(tmp_path))
     assert result.category != "write"
 
 
-def test_mkdir_not_write():
+def test_mkdir_not_write(tmp_path):
     """创建目录不是修改文件 → 不触发写确认。"""
-    result = safety.analyze_command("mkdir C:\\work\\new", cwd="C:\\work")
+    result = safety.analyze_command("mkdir C:\\work\\new", cwd=str(tmp_path))
     assert result.verdict == safety.ALLOW
 
 
-def test_delete_stays_block_not_confirm():
+def test_delete_stays_block_not_confirm(tmp_path):
     """删除命令保持 BLOCK，不降级为写确认。"""
-    result = safety.analyze_command("Remove-Item C:\\work\\a.txt", cwd="C:\\work")
+    result = safety.analyze_command("Remove-Item C:\\work\\a.txt", cwd=str(tmp_path))
     assert result.verdict == safety.BLOCK
     assert result.category != "write"
 

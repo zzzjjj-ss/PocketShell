@@ -163,29 +163,46 @@ def _is_inside(path: str, parent: str) -> bool:
 
 
 def _check_self_dir(command: str, cwd: Optional[str]) -> Optional[SafetyResult]:
-    """检查命令是否针对 agent 自身目录；命中返回 BLOCK 结果，否则 None。"""
-    from .config import AGENT_DIR
+    """检查命令是否针对项目自身目录；命中返回 BLOCK 结果，否则 None。
 
-    agent_dir = str(AGENT_DIR)
+    保护范围是整个项目根（ROOT_DIR）：包程序、run.bat、config.json、sessions 等
+    都在其中——删掉任何一个都可能让 PocketShell 失效，因此一律拦截。
+    """
+    from .config import ROOT_DIR
+
+    project_dir = str(ROOT_DIR)
     norm_cmd = command.replace("\\", "/").lower()
-    norm_agent = agent_dir.replace("\\", "/").lower()
-    in_agent_text = norm_agent in norm_cmd
-    in_agent_cwd = bool(cwd) and _is_inside(cwd, agent_dir)
-    if not (in_agent_text or in_agent_cwd):
+    norm_project = project_dir.replace("\\", "/").lower()
+    in_self_text = norm_project in norm_cmd
+    in_self_cwd = bool(cwd) and _is_inside(cwd, project_dir)
+    if not (in_self_text or in_self_cwd):
         return None
 
+    if in_self_text:
+        # 命令明确指向项目目录内文件：删除/修改一律硬拦
+        for pattern in _SELF_DESTRUCTIVE:
+            if re.search(pattern, command, re.IGNORECASE):
+                return SafetyResult(
+                    verdict=BLOCK,
+                    reason="禁止删除/清空/格式化项目目录下的文件（防止 PocketShell 被改死）",
+                    matches=[pattern],
+                )
+        for pattern in _SELF_MODIFY:
+            if re.search(pattern, command, re.IGNORECASE):
+                return SafetyResult(
+                    verdict=BLOCK,
+                    reason="禁止移动/重命名/覆盖项目目录下的文件（防止 PocketShell 被改死）",
+                    matches=[pattern],
+                )
+        return None
+
+    # 仅 cwd 在项目目录内（命令无明确路径）：删除类硬拦（Remove-Item * 会清空自身）；
+    # 写操作交给 FILE_WRITE_CONFIRM 确认层，避免误伤"在项目目录里新建文件"。
     for pattern in _SELF_DESTRUCTIVE:
         if re.search(pattern, command, re.IGNORECASE):
             return SafetyResult(
                 verdict=BLOCK,
-                reason="禁止删除/清空/格式化 agent 自身目录下的文件（防止 agent 被改死）",
-                matches=[pattern],
-            )
-    for pattern in _SELF_MODIFY:
-        if re.search(pattern, command, re.IGNORECASE):
-            return SafetyResult(
-                verdict=BLOCK,
-                reason="禁止移动/重命名/覆盖 agent 自身目录下的文件（防止 agent 被改死）",
+                reason="禁止在项目目录内执行删除/清空操作（防止 PocketShell 被改死）",
                 matches=[pattern],
             )
     return None

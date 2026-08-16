@@ -17,10 +17,15 @@ import os
 from pathlib import Path
 from typing import Dict
 
-# agent 包所在目录（所有数据文件的默认根）
+# 项目根目录（解压根 / 仓库根）：包目录的父目录。
+# 所有用户数据（config.json / sessions/ / memory.txt）默认放这里，
+# 保证"根目录一个 config.json"，而不是藏进包目录。
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
+# agent 包所在目录（程序文件；自毁防护保护整个 ROOT_DIR）
 AGENT_DIR = Path(__file__).resolve().parent
 
-CONFIG_PATH = Path(os.environ.get("SGPT_CONFIG_PATH", AGENT_DIR / "config.json"))
+CONFIG_PATH = Path(os.environ.get("SGPT_CONFIG_PATH", ROOT_DIR / "config.json"))
 
 # 内置默认值（均为字符串，与配置文件的键值格式一致）
 # 注意：这里只放常量默认值；环境变量由 Config.get 每次实时读取（优先于本表）。
@@ -62,9 +67,9 @@ DEFAULTS: Dict[str, str] = {
     # 每轮对话后是否显示 token 消耗统计（含缓存命中）
     "SHOW_USAGE": "true",
     "REQUEST_TIMEOUT": "120",
-    # ---- 路径（默认都在 agent 目录下，便携） ----
-    "SESSIONS_DIR": str(AGENT_DIR / "sessions"),
-    "MEMORY_FILE": str(AGENT_DIR / "memory.txt"),
+    # ---- 路径（默认都在项目根目录下，便携） ----
+    "SESSIONS_DIR": str(ROOT_DIR / "sessions"),
+    "MEMORY_FILE": str(ROOT_DIR / "memory.txt"),
     # ---- 自定义指令 ----
     # 追加到系统提示词末尾的额外指令（可留空）；写在这里不动代码即可改 agent 行为
     "CUSTOM_INSTRUCTIONS": "",
@@ -282,7 +287,7 @@ def _migrate_old_sgptrc() -> str:
 
     迁移完成后删除旧文件与空的 config/ 目录。
     """
-    old_path = AGENT_DIR / "config" / ".sgptrc"
+    old_path = ROOT_DIR / "config" / ".sgptrc"
     if not old_path.exists():
         return ""
     text = None
