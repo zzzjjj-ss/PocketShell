@@ -63,6 +63,8 @@ PocketShell 是一个面向 Windows 的终端 AI 助手(shell agent),基于 Deep
 | `run.bat --show-chat NAME` | 查看会话历史 |
 | `run.bat --clear NAME` | 清除会话(如 `--clear default`) |
 | `run.bat --doctor` | 配置健康检查(诊断 API Key 读取问题) |
+| `run.bat -setworkspace` | 把**当前目录**设为工作目录:其内写文件免确认,删除仍硬拦;`-setworkspace off` 关闭 |
+| `run.bat -setworkspace D:\work` | 指定目录为工作目录(仅本次运行生效,关闭窗口或 cd 离开后自动失效) |
 
 默认模型 `deepseek-v4-flash`,`--model deepseek-v4-pro` 可切换。
 
@@ -191,6 +193,10 @@ pocketshell/
 - 工具输出截断(默认 2000 字符),防脏输出灌满上下文;
 - **DeepSeek 思考内容(reasoning_content)仅展示、绝不回存历史**——V4 默认思考模式,
   思考 token 占比大,不回存使每轮思考只计费一次;
+- **系统提示词按频率注入(省 token 关键)**:`SYSTEM_PROMPT_INTERVAL`(默认 3)控制
+  每 N 轮对话才完整注入一次 system 提示词——system 出现一次后,模型在上下文缓存中
+  "记得"其内容,中间轮次不再重复发送,请求体积显著变小(首轮与 cwd 变化轮始终注入)。
+  调成 1 = 每轮注入(最保守),调大 = 更省;
 - 记忆外置到 `memory.txt`,按需 recall,不常驻上下文;
 - 仅 7 个轻量工具,工具 schema 本身占用的 token 远小于重型 agent。
 

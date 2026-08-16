@@ -67,6 +67,8 @@ is a single directory.
 | `run.bat --show-chat NAME` | View session history |
 | `run.bat --clear NAME` | Clear a session (e.g. `--clear default`) |
 | `run.bat --doctor` | Config health check (diagnose API key issues) |
+| `run.bat -setworkspace` | Set **current directory** as workspace: file writes inside need no confirm, deletes still blocked; `-setworkspace off` disables |
+| `run.bat -setworkspace D:\work` | Set a specific workspace dir (lasts only this run; expires on window close or `cd` away) |
 
 Default model: `deepseek-v4-flash`. Switch with `--model deepseek-v4-pro`.
 
@@ -199,6 +201,10 @@ Supports `//` comments, editable in VS Code:
 - Tool output truncated (2000 chars default).
 - **DeepSeek reasoning content shown but never stored in history** — each turn's reasoning is
   billed once.
+- **System prompt injected on an interval (biggest saving)**: `SYSTEM_PROMPT_INTERVAL` (default 3)
+  sends the full system prompt only every N turns — once it has appeared, the model "remembers" it
+  in the context cache, so intermediate turns skip it and requests stay small (first turn and
+  cwd-changed turns always inject). Set 1 = every turn (most conservative), higher = leaner.
 - Memory lives in `memory.txt`, recalled on demand, never resident in context.
 - Only 7 lightweight tools — far smaller schema overhead than heavy agents.
 
