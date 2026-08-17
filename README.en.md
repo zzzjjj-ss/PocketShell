@@ -21,7 +21,7 @@ is a single directory.
   - Bypass attempts blocked: `-EncodedCommand`, `iex`, Base64, variable indirection,
     nested `cmd /c` analysis
 - 💰 **Token savings**: auto-truncated context budget, truncated tool output, DeepSeek reasoning
-  content shown but never re-sent, per-turn token usage + cache-hit display
+  content shown but never re-sent, per-turn token usage + cache-hit display + input breakdown
 - 🧠 **DeepSeek native**: default `deepseek-v4-flash`, switch to `deepseek-v4-pro`;
   any OpenAI-compatible endpoint via `API_BASE_URL`
 - 🛠️ 7 lightweight tools: shell (guarded) / memory (remember/recall/forget/update_memory) /
@@ -133,7 +133,13 @@ pocketshell/
      overwrite of anything inside is BLOCKed, so the agent cannot break itself
 2. **System prompt constraints**: deletion forbidden, writes require confirmation, no bypasses.
 3. **Tool output truncation**: shell results are truncated to 2000 chars by default.
-4. **Per-turn usage stats**: input/output tokens + cache hit (`SHOW_USAGE`, `--no-usage` to hide).
+4. **Per-turn usage stats**: input/output tokens + **input breakdown** (prompt injection +
+   accumulated context + this-turn new content, estimated) + cache hit
+   (`SHOW_USAGE`, `--no-usage` to hide).
+   - Example: `input 29188 ≈ prompt 379 + context 26300 + new 2508 (est) + output 328 (3 requests, tool loop) | cache hit 25344 (87%) | miss 3844`
+   - Input is the **accumulated total across all API requests this turn** (tool loop/retries each
+     resend the full history), so per-turn input = per-request input × request count; only the
+     "miss" part is billed at full price (cache hits cost ~1/60), so high hit rate means low cost.
 
 > Note: static analysis cannot be 100% robust against arbitrary obfuscation; avoid running on
 > important machines without backups.

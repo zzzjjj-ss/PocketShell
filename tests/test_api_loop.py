@@ -2,7 +2,7 @@
 """工具调用循环的 mock 测试：模拟 DeepSeek SSE 流，验证
 一轮工具调用（assistant tool_calls → tool 结果 → 继续请求 → 最终文本）。
 
-运行：cd /home/zhang/sgpt && HOME=/tmp/sgpt_test_home python3 -m pytest agent/tests/test_api_loop.py -q
+运行：cd /home/zhang/sgpt && HOME=/tmp/sgpt_test_home python3 -m pytest pocketshell/tests/test_api_loop.py -q
 """
 import json
 import sys
