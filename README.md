@@ -224,6 +224,8 @@ cd pocketshell                 # 仓库根
 HOME=$(mktemp -d) python3 -m pytest tests/ -q
 ```
 
+变更历史见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## License
 
 [Mozilla Public License Version 2.0](LICENSE)
