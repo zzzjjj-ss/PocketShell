@@ -205,6 +205,14 @@ pocketshell/
 - 记忆外置到 `memory.txt`,按需 recall,不常驻上下文;
 - 仅 7 个轻量工具,工具 schema 本身占用的 token 远小于重型 agent。
 
+## 中文文件名与编码(Windows)
+
+- 入口脚本(`run.bat` / `install.ps1` 生成的命令 / `green.bat`)内含 `chcp 65001 >nul`,
+  把控制台代码页切到 UTF-8——这是 **Windows 简体中文系统下 ffmpeg 等程序处理中文
+  文件名不报 `Illegal byte sequence` 的关键**(实测:去掉它中文文件名直接打不开)。
+- chcp 在启动时执行一次,可能让终端"重绘"一次(看起来像清屏),属正常现象,不影响使用。
+- 若你自行修改入口脚本,请保留这行 `chcp 65001 >nul`,否则中文文件名会出编码问题。
+
 ## GREEN 绿色版(内置 Python,⚠️ 仅 Windows)
 
 `pocketshell-green.zip` 内置 **Windows 版 Python 3.13.15**(官方 embeddable 包),

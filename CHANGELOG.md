@@ -4,6 +4,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.2.2] - 2026-08-19
+
+### 修复
+
+- **chcp 65001 恢复在全部入口脚本**:用户实机验证这是 ffmpeg 等程序处理中文
+  文件名的关键(见下方 [未发布] 详细说明);green 版 `green.bat` 与 green 版
+  `install.ps1` 命令模板同步补齐,便携版与 green 版行为完全一致。
+- README 新增「中文文件名与编码」说明。
+
 ## [未发布]
 
 ### 修复
@@ -80,7 +89,8 @@
 - `install.bat` 自定义命令名装入 PATH(可选)
 - 中英双语 README、MPL-2.0 许可
 
-[未发布]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.1...HEAD
+[未发布]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zzzjjj-ss/PocketShell/releases/tag/v0.1.0
