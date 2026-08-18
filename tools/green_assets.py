@@ -25,6 +25,7 @@ $content = @'
 @echo off
 rem PocketShell entry (GREEN) - uses bundled python
 setlocal
+chcp 65001 >nul
 set PYTHONDONTWRITEBYTECODE=1
 "%~dp0..\\python\\python.exe" "%~dp0..\\pocketshell\\__main__.py" %*
 endlocal
