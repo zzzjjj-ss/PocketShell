@@ -9,6 +9,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import sys
 import time
 import urllib.error
@@ -128,11 +130,11 @@ def make_system_prompt() -> str:
 4. 禁止删除/移动/覆盖程序自身目录（PocketShell 所在目录）内任何文件。
 
 【工具规则】
-1. 涉及路径先确认实际位置（{path_cmd}），严禁凭猜测编造路径，cwd 只是启动值；第一次接触文件/目录必须先列目录确认存在，不得直接猜完整路径。
-2. 优先用只读命令获取真实信息，不凭空猜测；本地文件一律用 shell 命令查，不要用 web_search 搜。
+1. 当前工作目录已注入（见【环境】cwd），任务文件默认就在里面：直接用文件名/相对路径操作，严禁编造 D:\\ 盘符绝对路径（安全层会拦截含盘符绝对路径的命令，提示改用相对路径）。
+2. 若不确定文件名，先执行列目录命令（cmd: dir /b；PowerShell: Get-ChildItem）确认真实文件名，再继续。
 3. 需长期记住的信息（目录/设置/偏好）先 recall 查，没有则 remember 存；清除/变更用 forget/update_memory。
 4. 工具输出被截断时基于已有信息回答，不臆造缺失部分。
-5. 命令失败时先看错误输出判断原因（如程序不存在/路径不对/权限不足），换等价正确写法，不要反复盲试同一种失败命令。
+5. 命令失败时先看错误输出判断原因（如程序不存在/路径不对/权限不足），换等价正确写法；不要反复盲试同一种失败命令，更不要换 shell 再试同一条命令。
 
 【回答】简洁中文；代码/命令用 Markdown 代码块；不确定就说明，不编造。
 """
@@ -344,6 +346,58 @@ def _estimate_split(messages: List[Dict]) -> Dict[str, int]:
     return {"est_system": sys_tok, "est_context": ctx_tok, "est_new": new_tok}
 
 
+_LISTING_CMD = (
+    "dir", "ls", "pwd", "cd", "where", "where.exe", "echo",
+    "get-childitem", "gci", "get-location", "gl", "get-content", "cat",
+    "select-object", "test-path", "type",
+)
+
+
+def _is_listing_command(command: str) -> bool:
+    """命令是否为"列目录/查当前位置"类（允许作为首次动作）。"""
+    c = (command or "").strip().lower()
+    if not c:
+        return False
+    first = re.split(r"[\s|&;]", c, 1)[0].replace(".exe", "").strip('"\'').strip()
+    if first in _LISTING_CMD:
+        return True
+    return c.startswith("dir ") or c.startswith("ls ") or c.startswith("get-childitem")
+
+
+_DRIVE_PATH_RE = re.compile(r"(?i)\b[a-z]:[\\/]")
+
+
+def _has_drive_path(arguments: str) -> bool:
+    """工具参数中是否含盘符绝对路径（如 D:\\xxx）。只用于 execute_shell_command。"""
+    try:
+        parsed = json.loads(arguments or "{}")
+        command = parsed.get("shell_command", "") if isinstance(parsed, dict) else ""
+    except json.JSONDecodeError:
+        return False
+    return bool(_DRIVE_PATH_RE.search(command))
+
+
+def _has_listed_before(session) -> bool:
+    """会话历史中是否已执行过列目录类命令。"""
+    for m in session.messages:
+        if m.get("role") != "assistant":
+            continue
+        for tc in m.get("tool_calls") or []:
+            fn = tc.get("function") or {}
+            if fn.get("name") != "execute_shell_command":
+                continue
+            command = ""
+            try:
+                parsed = json.loads(fn.get("arguments") or "{}")
+                if isinstance(parsed, dict):
+                    command = parsed.get("shell_command", "")
+            except json.JSONDecodeError:
+                command = ""
+            if _is_listing_command(command):
+                return True
+    return False
+
+
 def run_conversation(
     session,
     model: str,
@@ -390,7 +444,20 @@ def run_conversation(
             for tc in tool_calls:
                 if on_tool:
                     on_tool(tc["function"]["name"], tc["function"]["arguments"])
-                result = run_tool(tc["function"]["name"], tc["function"]["arguments"])
+                name = tc["function"]["name"]
+                arguments = tc["function"]["arguments"]
+                if name == "execute_shell_command" and _has_drive_path(arguments):
+                    # 编造盘符绝对路径（如 D:\\下载\\xxx.mp3）：提示改用相对路径
+                    result = (
+                        "禁止编造盘符绝对路径（如 D:\\xxx\\file.mp3）。当前工作目录"
+                        f"是 {os.getcwd()}，任务文件默认就在里面：直接用文件名或相对路径操作；"
+                        "若不确定文件名，先执行列目录命令（cmd: dir /b；PowerShell: Get-ChildItem）。"
+                    )
+                    tool_msg = {"role": TOOL_ROLE, "content": result, "tool_call_id": tc["id"]}
+                    messages.append(tool_msg)
+                    session.add(tool_msg)
+                    continue
+                result = run_tool(name, arguments)
                 tool_msg = {"role": TOOL_ROLE, "content": result, "tool_call_id": tc["id"]}
                 messages.append(tool_msg)
                 session.add(tool_msg)

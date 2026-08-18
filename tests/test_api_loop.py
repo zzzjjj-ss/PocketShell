@@ -532,8 +532,9 @@ def test_prompt_uses_cmd_syntax_when_shell_is_cmd(monkeypatch):
     assert "if exist" in prompt
     # cmd 分支主命令应包含 cmd 的 cd 用法,而不是把 Get-Location 当主命令
     assert "cd /d" in prompt or "cd（不带参数" in prompt
-    # 本地文件用 shell 查,不用 web_search
-    assert "不要用 web_search" in prompt
+    # 提示词强调用相对路径、禁止编造盘符绝对路径
+    assert "相对路径" in prompt
+    assert "盘符绝对路径" in prompt
 
 
 def test_prompt_uses_powershell_syntax_when_shell_is_ps(monkeypatch):
@@ -548,3 +549,80 @@ def test_prompt_uses_powershell_syntax_when_shell_is_ps(monkeypatch):
     assert "Get-Location" in prompt
     # PowerShell 分支主命令不含 cmd 的 for 循环实际用法
     assert "for %f in" not in prompt
+
+
+def test_drive_path_guess_blocked(tmp_session, monkeypatch):
+    """模型第一次就猜 D:\\ 盘符绝对路径：应拦截并提示用相对路径/当前目录。"""
+    tool_args = json.dumps(
+        {"shell_command": 'Get-Item "D:\\下载\\回马喷.mp3" | Select-Object FullName'}
+    )
+
+    # 第一轮：模型猜测盘符绝对路径
+    first_round = _sse(_tool_chunk(0, "execute_shell_command", tool_args, "call_1"))
+    # 第二轮：模型改用列目录
+    second_round = _sse(_tool_chunk(0, "execute_shell_command", json.dumps({"shell_command": "dir /b"}), "call_2"))
+    # 第三轮：最终回答
+    third_round = _sse(_content_chunk("找到了回马喷.mp3。"))
+
+    calls = {"n": 0}
+
+    def fake_post(url, headers, payload, timeout):
+        round_resp = [first_round, second_round, third_round][calls["n"]]
+        calls["n"] += 1
+        return 200, FakeResponse(round_resp)
+
+    monkeypatch.setattr(api, "_post", fake_post)
+    monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+
+    tmp_session.add_user("把回马喷.mp3转成wav")
+
+    result = api.run_conversation(
+        tmp_session,
+        model="deepseek-v4-flash",
+        temperature=0.0,
+        top_p=1.0,
+        tools=[{"type": "function", "function": {"name": "execute_shell_command"}}],
+    )
+    assert result == "找到了回马喷.mp3。"
+
+    # 第一条 tool 消息必须是拦截提示（相对路径引导），而不是执行结果
+    tool_msgs = [m for m in tmp_session.messages if m["role"] == "tool"]
+    assert len(tool_msgs) == 2
+    assert "禁止编造盘符绝对路径" in tool_msgs[0]["content"]
+    assert "相对路径" in tool_msgs[0]["content"]
+    # 第二条 tool 消息是 dir /b 的真实执行结果（无拦截字样）
+    assert "禁止编造" not in tool_msgs[1]["content"]
+
+
+def test_relative_path_allowed(tmp_session, monkeypatch):
+    """用相对路径/当前目录文件名操作：不拦截，直接执行。"""
+    tool_args = json.dumps({"shell_command": "ffmpeg -i 回马喷.mp3 回马喷.wav"})
+
+    first_round = _sse(_tool_chunk(0, "execute_shell_command", tool_args, "call_1"))
+    second_round = _sse(_content_chunk("转换完成。"))
+
+    calls = {"n": 0}
+
+    def fake_post(url, headers, payload, timeout):
+        round_resp = [first_round, second_round][calls["n"]]
+        calls["n"] += 1
+        return 200, FakeResponse(round_resp)
+
+    monkeypatch.setattr(api, "_post", fake_post)
+    monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+
+    tmp_session.add_user("把回马喷.mp3转成wav")
+
+    result = api.run_conversation(
+        tmp_session,
+        model="deepseek-v4-flash",
+        temperature=0.0,
+        top_p=1.0,
+        tools=[{"type": "function", "function": {"name": "execute_shell_command"}}],
+    )
+    assert result == "转换完成。"
+    tool_msgs = [m for m in tmp_session.messages if m["role"] == "tool"]
+    assert len(tool_msgs) == 1
+    assert "禁止编造" not in tool_msgs[0]["content"]
