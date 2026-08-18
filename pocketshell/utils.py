@@ -143,8 +143,8 @@ def run_command(command: str, timeout: int = 60) -> Tuple[int, str]:
 
     Windows 下按 detect_shell() 检测结果执行：用户终端是 PowerShell 就走
     powershell.exe，是 cmd 就走 cmd.exe /d /c（与系统提示词、工具描述保持一致，
-    避免"提示说一套、实际执行另一套"的语义错乱）。cmd 分支前置 chcp 65001，
-    子进程按 UTF-8 处理中文参数/输出；输出以 UTF-8 优先解码，失败回退本地编码。
+    避免"提示说一套、实际执行另一套"的语义错乱）。执行方式与用户手动在终端
+    中运行完全一致，不附加任何编码前缀；输出以 UTF-8 优先解码，失败回退本地编码。
     """
     if IS_WINDOWS:
         shell_name = detect_shell()
@@ -153,10 +153,8 @@ def run_command(command: str, timeout: int = 60) -> Tuple[int, str]:
             full = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command]
         else:
             # cmd：/d 忽略 autorun 干扰；/c 执行后退出。
-            # 前置 chcp 65001 >nul：子进程代码页切 UTF-8，中文文件名传参给
-            # ffmpeg 等第三方程序不再出现 Illegal byte sequence；输出经管道
-            # 取回，不重绘用户终端（不像入口脚本 chcp 那样假清屏）。
-            full = ["cmd.exe", "/d", "/c", "chcp 65001 >nul & " + command]
+            # 注意：不加 chcp 等任何前缀，保持与用户手动在 cmd 中执行完全一致。
+            full = ["cmd.exe", "/d", "/c", command]
     else:
         full = [os.environ.get("SHELL", "/bin/sh"), "-c", command]
 

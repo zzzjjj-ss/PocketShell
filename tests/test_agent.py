@@ -815,8 +815,8 @@ def test_tool_schema_description_follows_shell():
         assert "Get-ChildItem" in desc
 
 
-def test_run_command_cmd_branch_uses_chcp(monkeypatch):
-    """cmd 分支执行命令时必须前置 chcp 65001（子进程 UTF-8，解决中文传参）。"""
+def test_run_command_cmd_branch_no_prefix(monkeypatch):
+    """cmd 分支执行命令必须与用户手动执行一致，不加 chcp 等任何前缀。"""
     from unittest import mock
     from pocketshell import utils
 
@@ -830,8 +830,6 @@ def test_run_command_cmd_branch_uses_chcp(monkeypatch):
             stderr = b""
         return _P()
 
-    monkeypatch.setattr(utils.IS_WINDOWS, "value", True) if hasattr(utils.IS_WINDOWS, "value") else None
-    # 模拟 Windows：直接 patch IS_WINDOWS 为 True（utils.IS_WINDOWS 是模块常量，需 patch 模块级）
     with mock.patch.object(utils, "IS_WINDOWS", True), \
          mock.patch.object(utils, "detect_shell", return_value="cmd.exe"), \
          mock.patch.object(utils.subprocess, "run", fake_subprocess_run):
@@ -840,7 +838,8 @@ def test_run_command_cmd_branch_uses_chcp(monkeypatch):
     cmd_list = calls[0]
     assert cmd_list[0] == "cmd.exe"
     assert cmd_list[1] == "/d" and cmd_list[2] == "/c"
-    assert cmd_list[3] == "chcp 65001 >nul & dir /b 回马喷.mp3"
+    assert cmd_list[3] == "dir /b 回马喷.mp3"  # 原样传递，无 chcp 前缀
+    assert "chcp" not in cmd_list[3]
     assert code == 0 and out == "ok"
 
 

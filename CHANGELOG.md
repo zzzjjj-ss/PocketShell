@@ -20,10 +20,11 @@
   不要 cd 去别的目录;绝对路径仅用户明确给出时使用。
 - **cmd 语法警告**:多条命令用 `&` 连接(不是 `;`,那是 PowerShell 分隔符);不要用
   PowerShell 的 `Select-Object`/`Get-ChildItem` 语法。
-- **中文文件名编码修复**:`run_command` 的 cmd 分支执行每条命令前自动加
-  `chcp 65001 >nul &`,子进程代码页切 UTF-8 —— 中文文件名传给 ffmpeg 等第三方
-  程序不再报 `Illegal byte sequence`,无需再 `copy` 到英文临时名绕路。chcp 在
-  子进程内执行、输出走管道,不重绘用户终端(无此前入口脚本 chcp 的假清屏副作用)。
+- **命令执行回归原样**:撤掉 cmd 分支的 `chcp 65001` 前缀——执行方式与用户
+  手动在终端运行完全一致,不加任何编码前缀。第三方程序(如 ffmpeg)的中文
+  文件名支持取决于程序自身构建(ANSI 入口 vs Unicode 入口),不是 PocketShell
+  能解决的;若遇 `Illegal byte sequence`,建议换官方版 ffmpeg(gyan.dev 构建
+  为 Unicode 入口,原生支持中文参数)。
 
 ### 已规划
 

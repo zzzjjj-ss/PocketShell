@@ -254,6 +254,25 @@ def _web_search(query: str) -> str:
         return f"搜索出错：{e}"
 
 
+# 进程内标记：本会话已确认过写文件操作（窗口关闭即失效）。
+# 第一次写操作必须人工确认，之后同一进程内的写操作免重复确认（删除类仍硬拦）。
+_confirm_write_granted = False
+
+
+def _reset_write_grant() -> None:
+    global _confirm_write_granted
+    _confirm_write_granted = False
+
+
+def _grant_write() -> None:
+    global _confirm_write_granted
+    _confirm_write_granted = True
+
+
+def _write_granted() -> bool:
+    return _confirm_write_granted
+
+
 # ---------------- shell 执行（带安全层） ----------------
 
 def _execute_shell(shell_command: str) -> str:
@@ -275,6 +294,8 @@ def _execute_shell(shell_command: str) -> str:
                 need_confirm = cfg.get_bool("FILE_WRITE_CONFIRM", True)
         else:
             need_confirm = cfg.get_bool("CONFIRM_DANGEROUS", True)
+        if need_confirm and result.category == "write" and _write_granted():
+            need_confirm = False  # 本进程已确认过写操作，不再重复打扰
         if need_confirm:
             # 交互环境要求确认；非交互（如管道）默认拒绝，安全优先
             try:
@@ -283,6 +304,8 @@ def _execute_shell(shell_command: str) -> str:
                 return f"非交互环境下高危命令未执行：{shell_command}"
             if reply != "y":
                 return "用户取消了该命令的执行。"
+            if result.category == "write":
+                _grant_write()  # 用户确认过写操作，本次进程内后续写免确认
 
     exit_code, output = run_command(shell_command)
     body = f"退出码: {exit_code}\n输出:\n{output}"
