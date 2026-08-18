@@ -6,6 +6,16 @@
 
 ## [未发布]
 
+### 修复
+
+- **shell 检测重写**:旧实现用 PSModulePath 段数判定,cmd 用户会被误判成 PowerShell,
+  导致提示词说一套、实际执行另一套,模型在两种语法间盲猜(如 `g 转换回马喷.mp3为wav`
+  任务 20+ 轮失败)。现改为检测**当前控制台宿主进程**(GetConsoleProcessList +
+  QueryFullProcessImageNameW):在 cmd 中启动就用 cmd 语法,在 PowerShell 中启动就用
+  PowerShell 语法;系统提示词、`execute_shell_command` 工具描述同步按检测结果动态生成。
+- **路径幻觉约束**:提示词强调第一次接触文件/目录必须先列目录确认存在、严禁直接猜完整
+  路径,本地文件一律用 shell 命令查(不用 web_search 搜),命令失败先看错误输出而非反复盲试。
+
 ### 已规划
 
 - 工具 schema 精简(约省 40% 每请求固定开销,`tools.py` 的 description 冗余)

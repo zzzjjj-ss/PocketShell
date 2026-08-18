@@ -518,3 +518,33 @@ def test_urllib_http_error_path(monkeypatch):
         assert "401" in str(exc.value)
     finally:
         server.shutdown()
+
+
+def test_prompt_uses_cmd_syntax_when_shell_is_cmd(monkeypatch):
+    """检测到 cmd 时,提示词应给出 cmd 语法示例(不再统一 PowerShell)。"""
+    from unittest import mock
+    from pocketshell.api import make_system_prompt
+
+    with mock.patch("pocketshell.utils.detect_shell", return_value="cmd.exe"):
+        prompt = make_system_prompt()
+    assert "cmd 语法" in prompt
+    assert "dir /b" in prompt
+    assert "if exist" in prompt
+    # cmd 分支主命令应包含 cmd 的 cd 用法,而不是把 Get-Location 当主命令
+    assert "cd /d" in prompt or "cd（不带参数" in prompt
+    # 本地文件用 shell 查,不用 web_search
+    assert "不要用 web_search" in prompt
+
+
+def test_prompt_uses_powershell_syntax_when_shell_is_ps(monkeypatch):
+    """检测到 PowerShell 时,提示词应给出 PowerShell 语法示例。"""
+    from unittest import mock
+    from pocketshell.api import make_system_prompt
+
+    with mock.patch("pocketshell.utils.detect_shell", return_value="powershell.exe"):
+        prompt = make_system_prompt()
+    assert "PowerShell 语法" in prompt
+    assert "Get-ChildItem" in prompt
+    assert "Get-Location" in prompt
+    # PowerShell 分支主命令不含 cmd 的 for 循环实际用法
+    assert "for %f in" not in prompt

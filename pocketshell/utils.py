@@ -17,14 +17,84 @@ from typing import List, Optional, Tuple
 IS_WINDOWS = platform.system() == "Windows"
 
 
-def detect_shell() -> str:
-    """返回实际使用的 shell 名称：powershell.exe / cmd.exe / bash / zsh ..."""
-    if IS_WINDOWS:
-        # 与上游一致：PSModulePath 中目录数 >= 3 判定为 PowerShell
-        ps_path = os.environ.get("PSModulePath", "")
-        if len(ps_path.split(os.pathsep)) >= 3:
+def _console_processes() -> List[int]:
+    """返回附加到当前控制台的所有进程 PID（Windows，GetConsoleProcessList）。"""
+    if not IS_WINDOWS:
+        return []
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        pid_list = (wintypes.DWORD * 32)()
+        n = kernel32.GetConsoleProcessList(pid_list, 32)
+        return [int(pid_list[i]) for i in range(n)]
+    except Exception:
+        return []
+
+
+def _pid_to_name(pid: int) -> str:
+    """把 PID 映射为可执行文件名（小写），失败返回空串。"""
+    if not IS_WINDOWS:
+        return ""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return ""
+        try:
+            buf = ctypes.create_unicode_buffer(1024)
+            size = wintypes.DWORD(1024)
+            if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                return buf.value.replace("\\", "/").split("/")[-1].lower()
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        pass
+    return ""
+
+
+def _decide_shell(console_pids: List[int], my_pid: int) -> str:
+    """从控制台进程列表判定用户实际使用的 shell（纯逻辑，便于测试）。
+
+    规则：控制台进程 = 用户 shell + 我们自身（及其子进程）。从列表里排除
+    自身与无关进程，优先取 cmd.exe / powershell.exe / pwsh.exe。
+    - 命中 powershell.exe / pwsh.exe → "powershell.exe"
+    - 命中 cmd.exe → "cmd.exe"
+    - 都未命中 → 回退 "cmd.exe"（Windows 兜底，与入口脚本一致）
+    """
+    for pid in console_pids:
+        if pid == my_pid:
+            continue
+        name = _pid_to_name(pid)
+        if name in ("powershell.exe", "pwsh.exe"):
             return "powershell.exe"
-        return "cmd.exe"
+    for pid in console_pids:
+        if pid == my_pid:
+            continue
+        name = _pid_to_name(pid)
+        if name == "cmd.exe":
+            return "cmd.exe"
+    return "cmd.exe"
+
+
+def detect_shell() -> str:
+    """返回命令执行使用的 shell 名称：powershell.exe / cmd.exe / bash / zsh ...
+
+    关键修正：旧的 PSModulePath 段数判定在 cmd 下恒为 >=3，把 cmd 用户误判成
+    PowerShell，导致提示词说一套、实际执行另一套，模型只能盲试语法（一会儿
+    Get-Item 一会儿 dir /x）。现在改为检测**当前控制台宿主进程**：
+    GetConsoleProcessList 拿到的进程列表必然包含用户实际在用的 shell，
+    据此返回 cmd.exe 或 powershell.exe——提示词与执行层保持一致，
+    模型不再需要猜语法。
+    注：返回值与 run_command 的执行方式必须一致，且会展示在系统提示词里。
+    """
+    if IS_WINDOWS:
+        return _decide_shell(_console_processes(), os.getpid())
     return os.path.basename(os.environ.get("SHELL", "/bin/sh"))
 
 
@@ -71,15 +141,19 @@ def truncate_text(text: str, max_chars: int = 2000, ellipsis: str = "\n…[输�
 def run_command(command: str, timeout: int = 60) -> Tuple[int, str]:
     """在用户 shell 中执行命令，返回 (exit_code, output)。
 
-    Windows 下自动选择 PowerShell / cmd，输出以 UTF-8 优先解码，失败回退本地编码。
+    Windows 下按 detect_shell() 检测结果执行：用户终端是 PowerShell 就走
+    powershell.exe，是 cmd 就走 cmd.exe /d /c（与系统提示词、工具描述保持一致，
+    避免"提示说一套、实际执行另一套"的语义错乱）；输出以 UTF-8 优先解码，
+    失败回退本地编码。
     """
     if IS_WINDOWS:
         shell_name = detect_shell()
         if shell_name == "powershell.exe":
-            # -NoProfile 避免用户 profile 干扰；-Command 执行
+            # -NoProfile 避免用户 profile 干扰；-NonInteractive 防止交互挂起；-Command 执行
             full = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command]
         else:
-            full = ["cmd.exe", "/c", command]
+            # cmd：/d 忽略 autorun 干扰；/c 执行后退出
+            full = ["cmd.exe", "/d", "/c", command]
     else:
         full = [os.environ.get("SHELL", "/bin/sh"), "-c", command]
 

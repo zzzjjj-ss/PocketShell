@@ -764,3 +764,52 @@ def test_launch_scripts_have_no_chcp():
             if "chcp 65001" in stripped.lower():
                 culprits.append(f"{p.relative_to(ROOT_DIR)}:{i}: {stripped}")
     assert not culprits, f"发现 chcp 65001 残留(可能触发假清屏):\n" + "\n".join(culprits)
+
+
+def test_decide_shell_prefers_powershell():
+    """控制台进程列表同时含 cmd 与 powershell 时,优先判定为 PowerShell。"""
+    from unittest import mock
+    from pocketshell import utils
+
+    with mock.patch.object(utils, "_pid_to_name", side_effect=lambda pid: {
+        100: "cmd.exe",
+        200: "powershell.exe",
+        300: "python.exe",
+    }.get(pid, "")):
+        # 列表含自身(300)与两个 shell → 应返回 powershell.exe
+        assert utils._decide_shell([100, 200, 300], 300) == "powershell.exe"
+        # 只有 cmd + 自身 → cmd.exe
+        assert utils._decide_shell([100, 300], 300) == "cmd.exe"
+        # 只有自身与无关进程 → 兜底 cmd.exe
+        assert utils._decide_shell([300, 400], 300) == "cmd.exe"
+
+
+def test_decide_shell_excludes_self():
+    """自身 PID 不应参与 shell 判定。"""
+    from unittest import mock
+    from pocketshell import utils
+
+    with mock.patch.object(utils, "_pid_to_name", side_effect=lambda pid: {
+        111: "python.exe",
+        222: "powershell.exe",
+    }.get(pid, "")):
+        # 自身 PID 就是 powershell.exe?不会,但列表中只有自身时不该判为 ps
+        assert utils._decide_shell([111], 111) == "cmd.exe"
+        # 另一个 powershell 进程(用户终端)才算
+        assert utils._decide_shell([111, 222], 111) == "powershell.exe"
+
+
+def test_tool_schema_description_follows_shell():
+    """execute_shell_command 的工具描述应按检测到的 shell 动态变化。"""
+    from unittest import mock
+    from pocketshell.tools import get_tool_schemas
+
+    with mock.patch("pocketshell.tools.detect_shell", return_value="cmd.exe"):
+        desc = get_tool_schemas(["execute_shell_command"])[0]["function"]["description"]
+        assert "cmd 语法" in desc
+        assert "dir" in desc
+
+    with mock.patch("pocketshell.tools.detect_shell", return_value="powershell.exe"):
+        desc = get_tool_schemas(["execute_shell_command"])[0]["function"]["description"]
+        assert "PowerShell 语法" in desc
+        assert "Get-ChildItem" in desc

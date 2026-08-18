@@ -16,7 +16,7 @@ from typing import Callable, Dict, List
 
 from . import safety
 from .config import AGENT_DIR, cfg
-from .utils import IS_WINDOWS, http_get, truncate_text
+from .utils import IS_WINDOWS, detect_shell, http_get, truncate_text
 
 # ---------------- 记忆文件（默认 agent 目录下，便携；可在配置中改路径） ----------------
 
@@ -294,17 +294,13 @@ def _execute_shell(shell_command: str) -> str:
 TOOLS: List[Dict] = [
     {
         "name": "execute_shell_command",
-        "description": (
-            "在用户的 Windows 终端（PowerShell 或 cmd）中执行一条 shell 命令并返回输出。"
-            "仅用于执行安全的只读或必要操作（查看目录、读取文件、运行工具等）。"
-            "删除/格式化/清空等破坏性指令会被安全层自动拦截，不要尝试绕过。"
-        ),
+        "description": "在用户当前终端（cmd 或 PowerShell）中执行一条命令并返回输出。具体语法按当前终端而定，见工具描述动态生成。",
         "parameters": {
             "type": "object",
             "properties": {
                 "shell_command": {
                     "type": "string",
-                    "description": "要执行的完整 shell 命令。",
+                    "description": "要执行的完整 shell 命令（语法与当前终端匹配）。",
                 }
             },
             "required": ["shell_command"],
@@ -420,18 +416,39 @@ TOOLS: List[Dict] = [
 _TOOLS_BY_NAME: Dict[str, Dict] = {t["name"]: t for t in TOOLS}
 
 
+def _shell_command_description() -> str:
+    """按当前终端实际 shell 生成 execute_shell_command 的工具描述。"""
+    shell = detect_shell()
+    if shell == "powershell.exe":
+        return (
+            "在 Windows PowerShell 中执行一条命令并返回输出（PowerShell 语法，"
+            "如 Get-ChildItem/Get-Item/Where-Object；不要用 cmd 的 dir /x、for %f、chcp）。"
+            "仅用于执行安全的只读或必要操作（查看目录、读取文件、运行工具等）。"
+            "删除/格式化/清空等破坏性指令会被安全层自动拦截，不要尝试绕过。"
+        )
+    return (
+        "在 Windows cmd 中执行一条命令并返回输出（cmd 语法，如 dir、where、type；"
+        "不要用 PowerShell 的 Get-ChildItem、Select-Object、$变量）。"
+        "仅用于执行安全的只读或必要操作（查看目录、读取文件、运行工具等）。"
+        "删除/格式化/清空等破坏性指令会被安全层自动拦截，不要尝试绕过。"
+    )
+
+
 def get_tool_schemas(include: List[str] | None = None) -> List[Dict]:
     """返回 OpenAI 兼容的 tools schema 列表；include 为 None 时返回全部。"""
     result = []
     for t in TOOLS:
         if include and t["name"] not in include:
             continue
+        description = t["description"]
+        if t["name"] == "execute_shell_command":
+            description = _shell_command_description()
         result.append(
             {
                 "type": "function",
                 "function": {
                     "name": t["name"],
-                    "description": t["description"],
+                    "description": description,
                     "parameters": t["parameters"],
                 },
             }
