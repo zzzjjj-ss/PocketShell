@@ -24,7 +24,6 @@ $cmdFile  = Join-Path $setupDir ($CmdName + '.cmd')
 $content = @'
 @echo off
 rem PocketShell entry (GREEN) - uses bundled python
-chcp 65001 >nul
 setlocal
 set PYTHONDONTWRITEBYTECODE=1
 "%~dp0..\\python\\python.exe" "%~dp0..\\pocketshell\\__main__.py" %*
@@ -49,8 +48,7 @@ Write-Host ('请新开一个终端，然后输入 ' + $CmdName + ' 试试，例�
 GREEN_BAT = (
     "@echo off\r\n"
     "rem PocketShell GREEN - bundled Python 3.13, zero install\r\n"
-    "chcp 65001 >nul\r\n"
-    "setlocal\r\n"
+        "setlocal\r\n"
     "set PYTHONDONTWRITEBYTECODE=1\r\n"
     '"%~dp0python\\python.exe" "%~dp0pocketshell\\__main__.py" %*\r\n'
     "endlocal\r\n"

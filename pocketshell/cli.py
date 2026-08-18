@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 from . import __version__
 from .api import ApiError, make_system_prompt, run_conversation
 from .config import cfg, ensure_config_file
-from .render import MarkdownStreamRenderer, enable_ansi, supports_color
+from .render import MarkdownStreamRenderer, enable_ansi, enable_utf8, supports_color
 from .session import Session
 from .tools import get_tool_schemas
 
@@ -259,6 +259,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 首次运行创建示例配置文件（幂等）
     ensure_config_file()
+
+    # 进程内设置 UTF-8 代码页（替代启动脚本的 chcp 65001；chcp 会触发终端重绘=假清屏）
+    enable_utf8()
 
     # 启用终端 ANSI 颜色（Windows cmd/PowerShell 需要显式开启 VT）
     enable_ansi()

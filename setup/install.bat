@@ -6,7 +6,6 @@ rem  then adds the setup folder to the CURRENT USER's PATH.
 rem  New terminal -> type: <name> "your question"
 rem  Safe: only touches HKCU\Environment\Path (user level).
 rem ============================================================
-chcp 65001 >nul
 setlocal
 set "CMDNAME="
 set /p CMDNAME=Command name [Enter=pocketshell]:

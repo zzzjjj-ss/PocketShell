@@ -726,3 +726,41 @@ def test_web_search_error_message(monkeypatch):
     monkeypatch.setattr(tools, "http_get", fake_http_get)
     out = tools._web_search("python")
     assert "搜索出错" in out and "timeout" in out
+
+
+# ---------------- 启动脚本不含 chcp(清屏回归保护) ----------------
+
+def test_enable_utf8_noop_on_nonwindows(monkeypatch):
+    """非 Windows 环境下 enable_utf8 无副作用(不抛异常、不动编码)。"""
+    from pocketshell import render
+    monkeypatch.setattr(render, "os", type("O", (), {"name": "posix"})())
+    enc_before = sys.stdout.encoding
+    render.enable_utf8()
+    assert sys.stdout.encoding == enc_before
+
+
+def test_launch_scripts_have_no_chcp():
+    """所有启动脚本/模板不得再出现 chcp 65001 —— chcp 会触发终端重绘=假清屏。"""
+    from pocketshell.config import ROOT_DIR
+    culprits = []
+    # 只查真正的启动脚本/模板(bat/ps1)与 green 模板文件——.py 里的 chcp 字样是
+    # render.py/cli.py 的说明注释,不是命令
+    targets = []
+    for pat in ("*.bat", "*.ps1"):
+        targets.extend(ROOT_DIR.rglob(pat))
+    tmpl = ROOT_DIR / "tools" / "green_assets.py"
+    if tmpl.exists():
+        targets.append(tmpl)
+    for p in targets:
+        if "__pycache__" in str(p) or "_build" in str(p) or ".git" in str(p):
+            continue
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            # 只拦截真正的命令残留: "chcp 65001" 命令
+            if "chcp 65001" in stripped.lower():
+                culprits.append(f"{p.relative_to(ROOT_DIR)}:{i}: {stripped}")
+    assert not culprits, f"发现 chcp 65001 残留(可能触发假清屏):\n" + "\n".join(culprits)

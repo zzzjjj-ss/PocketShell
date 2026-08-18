@@ -56,6 +56,32 @@ def enable_ansi() -> bool:
     return _vt_state
 
 
+def enable_utf8() -> None:
+    """在 Python 内部把控制台输出代码页设为 UTF-8（替代启动脚本里的 chcp 65001）。
+
+    chcp 65001 会触发终端重绘整个屏幕缓冲区——很多终端（Windows Terminal / 新版
+    conhost）下表现就是"清屏"，把用户输入的命令行和之前的内容全部冲掉。
+    改在进程内用 SetConsoleOutputCP 设置同样效果，但不触碰终端显示缓冲。
+    非 Windows 环境无需处理。
+    """
+    if os.name != "nt":
+        return
+    try:
+        if ctypes is not None:
+            kernel32 = ctypes.windll.kernel32
+            # 65001 = CP_UTF8
+            kernel32.SetConsoleOutputCP(65001)
+            kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass
+    # 让 Python 侧的 stdout 编码跟随控制台代码页（否则 print 仍按旧编码输出）
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 def supports_color() -> bool:
     """是否应该输出颜色：终端 + 未禁用颜色 + VT 可用。"""
     if os.environ.get("NO_COLOR"):
