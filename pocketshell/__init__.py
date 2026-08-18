@@ -4,4 +4,4 @@
 拷贝整个 agent 目录即可在任何装有 Python 3.10+ 的机器上运行，无需 pip install。
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"

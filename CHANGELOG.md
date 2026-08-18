@@ -10,6 +10,15 @@
 
 - 工具 schema 精简(约省 40% 每请求固定开销,`tools.py` 的 description 冗余)
 
+## [0.2.1] - 2026-08-18
+
+### 修复
+
+- **启动即"清屏"**:入口脚本里的 `chcp 65001` 会触发终端重绘整个屏幕缓冲区,
+  Windows Terminal / 新版 conhost 下表现为运行命令后命令行和之前的内容全部消失。
+  已将 chcp 从 `run.bat` / `g.cmd` 生成模板 / `green.bat` 全部移除,
+  改为 Python 进程内 `SetConsoleOutputCP(65001)`(UTF-8 效果相同,不触碰终端显示缓冲)。
+
 ## [0.2.0] - 2026-08-17
 
 ### 新增
@@ -50,6 +59,7 @@
 - `install.bat` 自定义命令名装入 PATH(可选)
 - 中英双语 README、MPL-2.0 许可
 
-[未发布]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.0...HEAD
+[未发布]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zzzjjj-ss/PocketShell/releases/tag/v0.1.0
