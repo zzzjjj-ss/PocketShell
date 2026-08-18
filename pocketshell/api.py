@@ -135,6 +135,7 @@ def make_system_prompt() -> str:
 3. 需长期记住的信息（目录/设置/偏好）先 recall 查，没有则 remember 存；清除/变更用 forget/update_memory。
 4. 工具输出被截断时基于已有信息回答，不臆造缺失部分。
 5. 命令失败时先看错误输出判断原因（如程序不存在/路径不对/权限不足），换等价正确写法；不要反复盲试同一种失败命令，更不要换 shell 再试同一条命令。
+6. 遇到 Illegal byte sequence / Error opening input 且涉及中文文件名：这是 Windows 系统代码页(GBK)与程序 UTF-8 路径不兼容，与命令写法无关，重试无用。停止并告知用户两个解决办法：①开系统 UTF-8 Beta（控制面板→区域→更改系统区域设置→勾选 Beta UTF-8，重启）；②把文件重命名为英文再操作（需用户确认后执行 copy/rename）。
 
 【回答】简洁中文；代码/命令用 Markdown 代码块；不确定就说明，不编造。
 """
