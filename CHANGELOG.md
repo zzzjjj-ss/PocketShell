@@ -20,6 +20,10 @@
   不要 cd 去别的目录;绝对路径仅用户明确给出时使用。
 - **cmd 语法警告**:多条命令用 `&` 连接(不是 `;`,那是 PowerShell 分隔符);不要用
   PowerShell 的 `Select-Object`/`Get-ChildItem` 语法。
+- **中文文件名编码修复**:`run_command` 的 cmd 分支执行每条命令前自动加
+  `chcp 65001 >nul &`,子进程代码页切 UTF-8 —— 中文文件名传给 ffmpeg 等第三方
+  程序不再报 `Illegal byte sequence`,无需再 `copy` 到英文临时名绕路。chcp 在
+  子进程内执行、输出走管道,不重绘用户终端(无此前入口脚本 chcp 的假清屏副作用)。
 
 ### 已规划
 

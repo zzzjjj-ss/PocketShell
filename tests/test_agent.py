@@ -813,3 +813,57 @@ def test_tool_schema_description_follows_shell():
         desc = get_tool_schemas(["execute_shell_command"])[0]["function"]["description"]
         assert "PowerShell 语法" in desc
         assert "Get-ChildItem" in desc
+
+
+def test_run_command_cmd_branch_uses_chcp(monkeypatch):
+    """cmd 分支执行命令时必须前置 chcp 65001（子进程 UTF-8，解决中文传参）。"""
+    from unittest import mock
+    from pocketshell import utils
+
+    calls = []
+
+    def fake_subprocess_run(cmd_list, **kw):
+        calls.append(cmd_list)
+        class _P:
+            returncode = 0
+            stdout = b"ok"
+            stderr = b""
+        return _P()
+
+    monkeypatch.setattr(utils.IS_WINDOWS, "value", True) if hasattr(utils.IS_WINDOWS, "value") else None
+    # 模拟 Windows：直接 patch IS_WINDOWS 为 True（utils.IS_WINDOWS 是模块常量，需 patch 模块级）
+    with mock.patch.object(utils, "IS_WINDOWS", True), \
+         mock.patch.object(utils, "detect_shell", return_value="cmd.exe"), \
+         mock.patch.object(utils.subprocess, "run", fake_subprocess_run):
+        code, out = utils.run_command("dir /b 回马喷.mp3")
+    assert calls, "subprocess.run 未被调用"
+    cmd_list = calls[0]
+    assert cmd_list[0] == "cmd.exe"
+    assert cmd_list[1] == "/d" and cmd_list[2] == "/c"
+    assert cmd_list[3] == "chcp 65001 >nul & dir /b 回马喷.mp3"
+    assert code == 0 and out == "ok"
+
+
+def test_run_command_ps_branch_no_chcp(monkeypatch):
+    """PowerShell 分支不用 chcp（PowerShell 原生 UTF-16 传参）。"""
+    from unittest import mock
+    from pocketshell import utils
+
+    calls = []
+
+    def fake_subprocess_run(cmd_list, **kw):
+        calls.append(cmd_list)
+        class _P:
+            returncode = 0
+            stdout = b"ok"
+            stderr = b""
+        return _P()
+
+    with mock.patch.object(utils, "IS_WINDOWS", True), \
+         mock.patch.object(utils, "detect_shell", return_value="powershell.exe"), \
+         mock.patch.object(utils.subprocess, "run", fake_subprocess_run):
+        code, out = utils.run_command("Get-ChildItem")
+    cmd_list = calls[0]
+    assert cmd_list[0] == "powershell.exe"
+    assert cmd_list[1:4] == ["-NoProfile", "-NonInteractive", "-Command"]
+    assert cmd_list[4] == "Get-ChildItem"
