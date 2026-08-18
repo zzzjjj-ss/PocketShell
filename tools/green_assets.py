@@ -49,6 +49,7 @@ GREEN_BAT = (
     "@echo off\r\n"
     "rem PocketShell GREEN - bundled Python 3.13, zero install\r\n"
         "setlocal\r\n"
+    "chcp 65001 >nul\r\n"
     "set PYTHONDONTWRITEBYTECODE=1\r\n"
     '"%~dp0python\\python.exe" "%~dp0pocketshell\\__main__.py" %*\r\n'
     "endlocal\r\n"

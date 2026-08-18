@@ -739,12 +739,11 @@ def test_enable_utf8_noop_on_nonwindows(monkeypatch):
     assert sys.stdout.encoding == enc_before
 
 
-def test_launch_scripts_have_no_chcp():
-    """所有启动脚本/模板不得再出现 chcp 65001 —— chcp 会触发终端重绘=假清屏。"""
+def test_launch_scripts_include_chcp():
+    """启动脚本必须含 chcp 65001 —— 用户实机验证：无它则 ffmpeg 中文文件名报
+    Illegal byte sequence（GBK 控制台代码页 vs 程序 UTF-8 路径），加回后正常。"""
     from pocketshell.config import ROOT_DIR
-    culprits = []
-    # 只查真正的启动脚本/模板(bat/ps1)与 green 模板文件——.py 里的 chcp 字样是
-    # render.py/cli.py 的说明注释,不是命令
+    missing = []
     targets = []
     for pat in ("*.bat", "*.ps1"):
         targets.extend(ROOT_DIR.rglob(pat))
@@ -754,16 +753,18 @@ def test_launch_scripts_have_no_chcp():
     for p in targets:
         if "__pycache__" in str(p) or "_build" in str(p) or ".git" in str(p):
             continue
+        # 只检查入口类脚本：run.bat / install.ps1（内含生成的 .cmd 模板）/ green 模板。
+        # install.bat/uninstall.bat 是安装器本身，不需要 chcp。
+        name = p.name.lower()
+        if name not in ("run.bat", "install.ps1", "green_assets.py"):
+            continue
         try:
             text = p.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        for i, line in enumerate(text.splitlines(), 1):
-            stripped = line.strip()
-            # 只拦截真正的命令残留: "chcp 65001" 命令
-            if "chcp 65001" in stripped.lower():
-                culprits.append(f"{p.relative_to(ROOT_DIR)}:{i}: {stripped}")
-    assert not culprits, f"发现 chcp 65001 残留(可能触发假清屏):\n" + "\n".join(culprits)
+        if "chcp 65001" not in text.lower():
+            missing.append(str(p))
+    assert not missing, f"以下入口脚本缺少 chcp 65001(会导致中文文件名 Illegal byte sequence):\n" + "\n".join(missing)
 
 
 def test_decide_shell_prefers_powershell():

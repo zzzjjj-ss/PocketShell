@@ -20,11 +20,12 @@
   不要 cd 去别的目录;绝对路径仅用户明确给出时使用。
 - **cmd 语法警告**:多条命令用 `&` 连接(不是 `;`,那是 PowerShell 分隔符);不要用
   PowerShell 的 `Select-Object`/`Get-ChildItem` 语法。
-- **命令执行回归原样**:撤掉 cmd 分支的 `chcp 65001` 前缀——执行方式与用户
-  手动在终端运行完全一致,不加任何编码前缀。第三方程序(如 ffmpeg)的中文
-  文件名支持取决于程序自身构建(ANSI 入口 vs Unicode 入口),不是 PocketShell
-  能解决的;若遇 `Illegal byte sequence`,建议换官方版 ffmpeg(gyan.dev 构建
-  为 Unicode 入口,原生支持中文参数)。
+- **chcp 65001 加回入口脚本(用户实测正解)**:此前以为 chcp 触发假清屏而移除,
+  导致 ffmpeg 打开中文文件名报 `Illegal byte sequence`。用户实机验证:**把
+  `chcp 65001 >nul` 加回启动脚本后一切正常**(控制台代码页切 UTF-8,cmd 传给
+  程序的中文参数不再按 GBK 转坏)。现已在 `run.bat` / `install.ps1` 生成的
+  `.cmd` 模板 / green 版 `green.bat` 模板全部加回。之前"chcp 无效、需换 ffmpeg
+  或开系统 UTF-8"的判断是错误的,特此更正。
 
 ### 已规划
 
