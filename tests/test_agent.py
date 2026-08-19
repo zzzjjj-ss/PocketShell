@@ -762,7 +762,7 @@ def test_enable_utf8_noop_on_nonwindows(monkeypatch):
 
 
 def test_launch_scripts_include_chcp():
-    """启动脚本必须含 chcp 65001 —— 用户实机验证：无它则 ffmpeg 中文文件名报
+    """启动脚本必须含 chcp 65001 —— 无它则 ffmpeg 中文文件名报
     Illegal byte sequence（GBK 控制台代码页 vs 程序 UTF-8 路径），加回后正常。"""
     from pocketshell.config import ROOT_DIR
     missing = []

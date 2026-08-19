@@ -44,8 +44,8 @@
 
 ### 修复
 
-- **chcp 65001 恢复在全部入口脚本**:用户实机验证这是 ffmpeg 等程序处理中文
-  文件名的关键(见下方 [未发布] 详细说明);green 版 `green.bat` 与 green 版
+- **chcp 65001 恢复在全部入口脚本**:这是 ffmpeg 等程序处理中文文件名的关键
+  (见下方 [未发布] 详细说明);green 版 `green.bat` 与 green 版
   `install.ps1` 命令模板同步补齐,便携版与 green 版行为完全一致。
 - README 新增「中文文件名与编码」说明。
 
@@ -63,8 +63,8 @@
   不要 cd 去别的目录;绝对路径仅用户明确给出时使用。
 - **cmd 语法警告**:多条命令用 `&` 连接(不是 `;`,那是 PowerShell 分隔符);不要用
   PowerShell 的 `Select-Object`/`Get-ChildItem` 语法。
-- **chcp 65001 加回入口脚本(用户实测正解)**:此前以为 chcp 触发假清屏而移除,
-  导致 ffmpeg 打开中文文件名报 `Illegal byte sequence`。用户实机验证:**把
+- **chcp 65001 加回入口脚本**:此前以为 chcp 触发假清屏而移除,
+  导致 ffmpeg 打开中文文件名报 `Illegal byte sequence`。实测:**把
   `chcp 65001 >nul` 加回启动脚本后一切正常**(控制台代码页切 UTF-8,cmd 传给
   程序的中文参数不再按 GBK 转坏)。现已在 `run.bat` / `install.ps1` 生成的
   `.cmd` 模板 / green 版 `green.bat` 模板全部加回。之前"chcp 无效、需换 ffmpeg
