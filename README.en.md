@@ -10,23 +10,23 @@ is a single directory.
 
 ## Features
 
-- 🪟 **Portable & self-contained**: program, config, sessions and memory all live in one folder;
+- **Portable & self-contained**: program, config, sessions and memory all live in one folder;
   copy it anywhere and it just works. A **GREEN edition** (bundled Python 3.13) runs without even
   installing Python.
-- 🛡️ **Safety rules** (enforced in code, not by prompt):
+- **Safety rules** (enforced in code, not by prompt):
   - Delete / clear / format commands are **BLOCKED** (`del`, `rm -rf`, `Remove-Item`, `format`,
     `diskpart clean`, and more)
   - File writes (create/overwrite/move/rename/copy) ask for confirmation (`FILE_WRITE_CONFIRM`)
   - **Self-destruction guard**: the agent can never delete or modify its own folder
   - Bypass attempts blocked: `-EncodedCommand`, `iex`, Base64, variable indirection,
     nested `cmd /c` analysis
-- 💰 **Token savings**: auto-truncated context budget, truncated tool output, DeepSeek reasoning
+- **Token savings**: auto-truncated context budget, truncated tool output, DeepSeek reasoning
   content shown but never re-sent, per-turn token usage + cache-hit display + input breakdown
-- 🧠 **DeepSeek native**: default `deepseek-v4-flash`, switch to `deepseek-v4-pro`;
+- **DeepSeek native**: default `deepseek-v4-flash`, switch to `deepseek-v4-pro`;
   any OpenAI-compatible endpoint via `API_BASE_URL`
-- 🛠️ 7 lightweight tools: shell (guarded) / memory (remember/recall/forget/update_memory) /
+- 7 lightweight tools: shell (guarded) / memory (remember/recall/forget/update_memory) /
   Bing search / web fetch
-- 📦 **Zero third-party deps**: pure stdlib (`urllib`/`ssl`/`http.client`), no pip install needed
+- **Zero third-party deps**: pure stdlib (`urllib`/`ssl`/`http.client`), no pip install needed
 
 ## Requirements
 
@@ -225,7 +225,7 @@ Supports `//` comments, editable in VS Code:
 - If you edit the entry scripts yourself, keep the `chcp 65001 >nul` line or Chinese
   filenames will hit encoding errors.
 
-## GREEN edition (bundled Python, ⚠️ Windows only)
+## GREEN edition (bundled Python, Windows only)
 
 `pocketshell-green.zip` bundles **Windows Python 3.13.15** (official embeddable package):
 no Python install, no pip, no registry writes, no PATH changes. Launch with `green.bat`.
@@ -233,7 +233,7 @@ no Python install, no pip, no registry writes, no PATH changes. Launch with `gre
 - **Size note**: ~10.6MB (zip) / ~40MB (extracted) — much larger than the portable edition (45KB)
   because it ships the whole Python interpreter. That's by design: size traded for zero-install.
   The portable edition needs only a system Python 3.10+; features are identical.
-- **⚠️ Windows only**: the bundled Python is the Windows build. On Linux/macOS use the **portable
+- **Windows only**: the bundled Python is the Windows build. On Linux/macOS use the **portable
   edition** (source); Linux ships Python anyway.
 - The bundled Python version is fixed; re-download the package to update it.
 

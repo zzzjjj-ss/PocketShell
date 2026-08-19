@@ -58,7 +58,7 @@ GREEN_BAT = (
 
 GREEN_README_HEAD = """# PocketShell — GREEN 绿色版(内置 Python 3.13,真·零安装)
 
-> **⚠️ 仅限 Windows**:内置的是 Windows 版 Python,**Linux / macOS 请用便携版源码**。
+> **仅限 Windows**:内置的是 Windows 版 Python,**Linux / macOS 请用便携版源码**。
 > 本目录已**内置 Python 3.13.15 解释器**(`python\\` 子目录),机器上不需要装任何东西:
 > 不用装 Python、不用 pip、不写注册表、不改系统 PATH、不碰 %APPDATA%,
 > 全部文件(程序 + Python + 配置 + 会话 + 记忆)都在本目录内,拷走即迁移。

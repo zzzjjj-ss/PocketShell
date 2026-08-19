@@ -80,9 +80,9 @@ def _show_usage(total: Dict[str, int]) -> None:
             parts.append(f"上下文 {ctx_t}")
         if new_t:
             parts.append(f"本轮新 {new_t}")
-        line = f"⚡ tokens: 输入 {p} ≈ {' + '.join(parts)}(估算)+ 输出 {c}"
+        line = f"[tokens] 输入 {p} ≈ {' + '.join(parts)}(估算)+ 输出 {c}"
     else:
-        line = f"⚡ tokens: 输入 {p} + 输出 {c}"
+        line = f"[tokens] 输入 {p} + 输出 {c}"
     if reqs > 1:
         line += f"（{reqs} 次请求，含工具循环）"
     if hit or miss:
@@ -221,9 +221,9 @@ def _doctor() -> int:
     try:
         key = cfg.get_api_key()
         masked = key[:6] + "…" + key[-4:] if len(key) > 10 else "<太短>"
-        print(f"\n结论: API Key 可读 ✓ ({masked})")
+        print(f"\n结论: API Key 可读 ({masked})")
     except RuntimeError:
-        print("\n结论: ✗ API Key 未配置 — 请在配置文件中填入 OPENAI_API_KEY=sk-xxx")
+        print("\n结论: [x] API Key 未配置 — 请在配置文件中填入 OPENAI_API_KEY=sk-xxx")
         print("       或设置环境变量 PS_API_KEY=sk-xxx")
     return 0
 

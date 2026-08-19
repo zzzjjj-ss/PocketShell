@@ -11,20 +11,20 @@ PocketShell 是一个面向 Windows 的终端 AI 助手(shell agent),基于 Deep
 
 ## 特性
 
-- 🪟 **便携自包含**:所有文件(程序 + 配置 + 会话 + 记忆)都在一个目录内,拷走即迁移,
+- **便携自包含**:所有文件(程序 + 配置 + 会话 + 记忆)都在一个目录内,拷走即迁移,
   不污染其它任何目录;另有 **GREEN 绿色版**(内置 Python 3.13),连 Python 都不用装
-- 🛡️ **安全铁律**(代码级硬拦截,不依赖模型自觉):
+- **安全铁律**(代码级硬拦截,不依赖模型自觉):
   - 删除/清空/格式化类指令直接 **BLOCK**(`del`/`rm -rf`/`Remove-Item`/`format`/`diskpart clean` 等)
   - 写文件操作(创建/覆盖/移动/重命名/复制)先征求确认(`FILE_WRITE_CONFIRM` 可配)
   - **自毁防护**:禁止 agent 删除/修改自己所在目录
   - 防绕过:`-EncodedCommand`/`iex`/Base64 解码/变量调用/`cmd /c` 嵌套递归分析
-- 💰 **省 token**:上下文自动截断预算、工具输出截断、DeepSeek 思考内容仅展示不回存、
+- **省 token**:上下文自动截断预算、工具输出截断、DeepSeek 思考内容仅展示不回存、
   每轮显示 token 消耗与**输入构成拆分**(提示词注入/上下文累计/本轮新输入)+ 缓存命中
-- 🧠 **DeepSeek 原生**:默认 `deepseek-v4-flash`,可切 `deepseek-v4-pro`;
+- **DeepSeek 原生**:默认 `deepseek-v4-flash`,可切 `deepseek-v4-pro`;
   支持任意 OpenAI 兼容端点(`API_BASE_URL`)
-- 🛠️ 7 个轻量工具:shell 执行(带安全层)/ 记忆(remember/recall/forget/update_memory)/
+- 7 个轻量工具:shell 执行(带安全层)/ 记忆(remember/recall/forget/update_memory)/
   Bing 搜索 / 网页抓取
-- 📦 **零第三方依赖**:纯标准库(urllib/ssl/http.client),不需要 pip 安装任何东西
+- **零第三方依赖**:纯标准库(urllib/ssl/http.client),不需要 pip 安装任何东西
 
 ## 环境要求
 
@@ -213,7 +213,7 @@ pocketshell/
 - chcp 在启动时执行一次,可能让终端"重绘"一次(看起来像清屏),属正常现象,不影响使用。
 - 若你自行修改入口脚本,请保留这行 `chcp 65001 >nul`,否则中文文件名会出编码问题。
 
-## GREEN 绿色版(内置 Python,⚠️ 仅 Windows)
+## GREEN 绿色版(内置 Python,仅 Windows)
 
 `pocketshell-green.zip` 内置 **Windows 版 Python 3.13.15**(官方 embeddable 包),
 机器上不需要装任何东西:不用装 Python、不用 pip、不写注册表、不改系统 PATH。启动用 `green.bat`。
@@ -221,7 +221,7 @@ pocketshell/
 - **体积说明**:green 包约 **10.6MB(zip)/ 40MB(解压)**,比便携版(45KB)大得多——
   因为它把整个 Python 解释器塞进去了,这是**设计使然**,体积换"零安装"。
   便携版只需系统装有 Python 3.10+,两者功能完全一致。
-- **⚠️ 仅限 Windows**:内置的是 Windows 版 Python,Linux / macOS 请使用**便携版**
+- **仅限 Windows**:内置的是 Windows 版 Python,Linux / macOS 请使用**便携版**
   (`pocketshell.zip` / 源码),Linux 大多自带 Python,直接跑即可,不需要 green 包。
 - 内置 Python 版本固定,需要新版本时重新下载本包。
 

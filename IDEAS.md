@@ -2,7 +2,7 @@
 
 本文件记录 PocketShell 的未来功能想法,不承诺实现顺序。
 
-## ✅ 2026-08-17 — `-setworkspace` 工作目录指令(用户 zhang 提出)—— 已实现(commit 待推)
+## 2026-08-17 — `-setworkspace` 工作目录指令(用户 zhang 提出)—— 已实现(commit 待推)
 
 **想法**:新增指令 `-setworkspace`,把当前目录设定为 agent 的「工作目录」。
 

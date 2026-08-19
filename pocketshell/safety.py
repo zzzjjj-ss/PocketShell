@@ -290,7 +290,7 @@ def block_reply(command: str, result: SafetyResult) -> str:
 
 def confirm_prompt(command: str, reason: str) -> str:
     return (
-        f"⚠️ 该命令属于高危操作（{reason}），请确认是否执行：\n"
+        f"[高危] 该命令属于高危操作（{reason}），请确认是否执行：\n"
         f"  {command}\n"
         "输入 y 执行，其它任意输入取消: "
     )

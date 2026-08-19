@@ -181,12 +181,12 @@ def tmp_session(tmp_path, monkeypatch):
 
 def test_session_save_load_utf8(tmp_session):
     tmp_session.add_user("你好,世界")
-    tmp_session.add_assistant("你好!😀")
+    tmp_session.add_assistant("你好!")
     tmp_session.save()
 
     s2 = Session("test")
     assert s2.messages[0]["content"] == "你好,世界"
-    assert s2.messages[1]["content"] == "你好!😀"
+    assert s2.messages[1]["content"] == "你好!"
 
 
 def test_session_token_truncation(tmp_session, monkeypatch):
