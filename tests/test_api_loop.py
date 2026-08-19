@@ -550,6 +550,26 @@ def test_prompt_uses_powershell_syntax_when_shell_is_ps(monkeypatch):
     # PowerShell 分支主命令不含 cmd 的 for 循环实际用法
     assert "for %f in" not in prompt
 
+
+def test_prompt_contains_methodology():
+    """提示词应包含完成任务的标准流程（勘察→验证→汇报），而非纯禁令清单。"""
+    from pocketshell.api import make_system_prompt
+    prompt = make_system_prompt()
+    assert "标准流程" in prompt
+    assert "勘察现状" in prompt
+    assert "验证" in prompt
+    assert "汇报" in prompt
+
+
+def test_prompt_contains_tool_choice():
+    """提示词应说明工具选择：web_search 先搜、fetch_url 看正文、别用 curl 存本地。"""
+    from pocketshell.api import make_system_prompt
+    prompt = make_system_prompt()
+    assert "web_search" in prompt
+    assert "fetch_url" in prompt
+    assert "不要用 curl" in prompt
+    assert "先 recall 查" in prompt
+
 def test_absolute_path_executed(tmp_session, monkeypatch):
     """绝对路径不再被代码拦截（提示词层面约束，代码放行），直接执行。"""
     tool_args = json.dumps(
