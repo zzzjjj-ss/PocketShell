@@ -6,6 +6,12 @@
 
 ## [未发布]
 
+### 已规划
+
+- 工具 schema 精简(约省 40% 每请求固定开销,`tools.py` 的 description 冗余)
+
+## [0.2.3] - 2026-08-19
+
 ### 修复
 
 - **Ctrl+C 取消不再丢上下文**:此前 `session.save()` 只在对话正常结束时调用,生成中
@@ -43,9 +49,7 @@
   `install.ps1` 命令模板同步补齐,便携版与 green 版行为完全一致。
 - README 新增「中文文件名与编码」说明。
 
-## [未发布]
-
-### 修复
+### 修复(随 v0.2.2 发布)
 
 - **shell 检测重写**:旧实现用 PSModulePath 段数判定,cmd 用户会被误判成 PowerShell,
   导致提示词说一套、实际执行另一套,模型在两种语法间盲猜(如 `g 转换回马喷.mp3为wav`
@@ -65,10 +69,6 @@
   程序的中文参数不再按 GBK 转坏)。现已在 `run.bat` / `install.ps1` 生成的
   `.cmd` 模板 / green 版 `green.bat` 模板全部加回。之前"chcp 无效、需换 ffmpeg
   或开系统 UTF-8"的判断是错误的,特此更正。
-
-### 已规划
-
-- 工具 schema 精简(约省 40% 每请求固定开销,`tools.py` 的 description 冗余)
 
 ## [0.2.1] - 2026-08-18
 
@@ -119,7 +119,8 @@
 - `install.bat` 自定义命令名装入 PATH(可选)
 - 中英双语 README、MPL-2.0 许可
 
-[未发布]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.2...HEAD
+[未发布]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/zzzjjj-ss/PocketShell/compare/v0.1.0...v0.2.0
