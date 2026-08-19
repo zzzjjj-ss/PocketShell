@@ -706,3 +706,114 @@ def test_connection_reset_after_output_raises(monkeypatch):
             top_p=1.0,
         )
     assert "连接中断" in str(exc.value)
+
+
+# ---------------- Ctrl+C 取消：上下文保存 ----------------
+
+class _InterruptResponse:
+    """迭代时抛 KeyboardInterrupt 的假响应（模拟用户按 Ctrl+C 中断流）。"""
+
+    def __init__(self):
+        self.status_code = 200
+
+    def iter_lines(self, decode_unicode=True):
+        raise KeyboardInterrupt()
+
+    def close(self):
+        pass
+
+
+def test_keyboard_interrupt_saves_session(tmp_session, monkeypatch):
+    """Ctrl+C 取消时，已产生的上下文（用户问题 + 已执行的工具链）必须落盘。"""
+    tool_args = json.dumps({"shell_command": "echo hello"})
+    first_round = _sse(_tool_chunk(0, "execute_shell_command", tool_args, "call_1"))
+    # 第一轮工具调用正常返回；第二轮流被 Ctrl+C 打断
+    def fake_post(url, headers, payload, timeout):
+        if not fake_post.called:
+            fake_post.called = True
+            return 200, FakeResponse(first_round)
+        return 200, _InterruptResponse()
+    fake_post.called = False
+
+    monkeypatch.setattr(api, "_post", fake_post)
+    monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+
+    tmp_session.add_user("查看当前目录")
+
+    with pytest.raises(KeyboardInterrupt):
+        api.run_conversation(
+            tmp_session,
+            model="deepseek-v4-flash",
+            temperature=0.0,
+            top_p=1.0,
+            tools=[{"type": "function", "function": {"name": "execute_shell_command"}}],
+        )
+
+    # 会话文件必须已落盘：包含用户问题与已执行的工具调用链
+    assert tmp_session.path.exists(), "Ctrl+C 后会话应已保存"
+    data = json.loads(tmp_session.path.read_text(encoding="utf-8"))
+    roles = [m["role"] for m in data]
+    assert "user" in roles, "用户问题应保留"
+    assert "tool" in roles, "已执行的工具链应保留"
+
+
+def test_keyboard_interrupt_without_shell_exec(tmp_session, monkeypatch):
+    """Ctrl+C 发生在第一轮流式响应中途：至少保存用户问题（无工具链）。"""
+    def fake_post(url, headers, payload, timeout):
+        return 200, _InterruptResponse()
+
+    monkeypatch.setattr(api, "_post", fake_post)
+    monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+
+    tmp_session.add_user("帮我查个东西")
+
+    with pytest.raises(KeyboardInterrupt):
+        api.run_conversation(
+            tmp_session,
+            model="deepseek-v4-flash",
+            temperature=0.0,
+            top_p=1.0,
+            tools=None,
+        )
+    assert tmp_session.path.exists(), "Ctrl+C 后会话应已保存"
+    data = json.loads(tmp_session.path.read_text(encoding="utf-8"))
+    assert data[-1]["role"] == "user"
+    assert data[-1]["content"] == "帮我查个东西"
+
+
+def test_repl_survives_keyboard_interrupt(tmp_path, monkeypatch):
+    """REPL 中生成时按 Ctrl+C：取消本轮但 REPL 继续，可再次提问，上下文保留。"""
+    from pocketshell import cli
+
+    monkeypatch.setenv("PS_SESSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("PS_CONFIG_PATH", str(tmp_path / "config.json"))
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+
+    calls = {"n": 0}
+
+    def fake_run(session, prompt, model, temperature, top_p, use_tools, max_tokens, show_usage):
+        calls["n"] += 1
+        session.add_user(prompt)
+        if calls["n"] == 1:
+            raise KeyboardInterrupt()  # 第一轮生成中被用户取消
+        session.add_assistant(f"回答{prompt}")
+        session.save()
+        return f"回答{prompt}"
+
+    monkeypatch.setattr(cli, "_run_turn", fake_run)
+    # input 序列：n==0 时返回第一问（将被取消）→ n==1 时第二问（成功）→ 之后 exit
+    monkeypatch.setattr("builtins.input", lambda *a, **k: "问1" if calls["n"] == 0 else ("问2" if calls["n"] == 1 else "exit"))
+    # 测试环境 stdin 非 tty：避免 cli 读取 stdin 作为 prompt
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+
+    rc = cli.main(["--repl"])
+    assert rc == 0
+    assert calls["n"] == 2, "取消后 REPL 应继续接受下一轮提问"
+
+    # 上下文保留：被取消的第一轮用户问题也在会话里（不丢上下文）
+    data = json.loads((tmp_path / "default.json").read_text(encoding="utf-8"))
+    contents = [m["content"] for m in data if m["role"] == "user"]
+    assert "问1" in contents, "被取消的那轮用户问题应保留"
+    assert "问2" in contents

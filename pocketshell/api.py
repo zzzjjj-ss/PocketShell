@@ -398,50 +398,59 @@ def run_conversation(
     max_rounds = cfg.get_int("MAX_TOOL_ROUNDS", 10)
     rounds = 0
 
-    while True:
-        rounds += 1
-        if rounds > max_rounds:
-            final_content = (
-                f"已达到工具调用轮数上限（{max_rounds} 轮），已停止继续尝试。\n"
-                "请基于已获得的信息回答；如果仍需要，请用户补充说明或手动操作。"
+    try:
+        while True:
+            rounds += 1
+            if rounds > max_rounds:
+                final_content = (
+                    f"已达到工具调用轮数上限（{max_rounds} 轮），已停止继续尝试。\n"
+                    "请基于已获得的信息回答；如果仍需要，请用户补充说明或手动操作。"
+                )
+                session.add_assistant(final_content)
+                session.save()
+                return final_content
+            # 本轮请求的构成拆分（提示词/上下文/新输入），附在 usage 回调里一并上报
+            est = _estimate_split(messages)
+
+            def _usage_cb(u: Dict, _est: Dict = est) -> None:
+                if on_usage:
+                    merged = dict(u)
+                    merged["est_system"] = _est["est_system"]
+                    merged["est_context"] = _est["est_context"]
+                    merged["est_new"] = _est["est_new"]
+                    on_usage(merged)
+
+            content, tool_calls, reasoning = stream_completion(
+                model, messages, tools, temperature, top_p,
+                max_tokens=max_tokens, on_chunk=on_chunk, on_usage=_usage_cb,
             )
+
+            if tool_calls:
+                # 记录 assistant 的工具调用消息
+                assistant = _assistant_msg(None, tool_calls)
+                messages.append(assistant)
+                session.add(assistant)
+                for tc in tool_calls:
+                    if on_tool:
+                        on_tool(tc["function"]["name"], tc["function"]["arguments"])
+                    name = tc["function"]["name"]
+                    arguments = tc["function"]["arguments"]
+                    result = run_tool(name, arguments)
+                    tool_msg = {"role": TOOL_ROLE, "content": result, "tool_call_id": tc["id"]}
+                    messages.append(tool_msg)
+                    session.add(tool_msg)
+                continue  # 继续下一轮请求
+
+            # 正常结束：记录 assistant 回复
+            final_content = content or ""
             session.add_assistant(final_content)
             session.save()
             return final_content
-        # 本轮请求的构成拆分（提示词/上下文/新输入），附在 usage 回调里一并上报
-        est = _estimate_split(messages)
-
-        def _usage_cb(u: Dict, _est: Dict = est) -> None:
-            if on_usage:
-                merged = dict(u)
-                merged["est_system"] = _est["est_system"]
-                merged["est_context"] = _est["est_context"]
-                merged["est_new"] = _est["est_new"]
-                on_usage(merged)
-
-        content, tool_calls, reasoning = stream_completion(
-            model, messages, tools, temperature, top_p,
-            max_tokens=max_tokens, on_chunk=on_chunk, on_usage=_usage_cb,
-        )
-
-        if tool_calls:
-            # 记录 assistant 的工具调用消息
-            assistant = _assistant_msg(None, tool_calls)
-            messages.append(assistant)
-            session.add(assistant)
-            for tc in tool_calls:
-                if on_tool:
-                    on_tool(tc["function"]["name"], tc["function"]["arguments"])
-                name = tc["function"]["name"]
-                arguments = tc["function"]["arguments"]
-                result = run_tool(name, arguments)
-                tool_msg = {"role": TOOL_ROLE, "content": result, "tool_call_id": tc["id"]}
-                messages.append(tool_msg)
-                session.add(tool_msg)
-            continue  # 继续下一轮请求
-
-        # 正常结束：记录 assistant 回复
-        final_content = content or ""
-        session.add_assistant(final_content)
-        session.save()
-        return final_content
+    except KeyboardInterrupt:
+        # 用户按 Ctrl+C 取消：先把已产生的上下文（用户问题 + 已执行的工具链）
+        # 落盘，避免下次启动丢失"取消的部分"；然后继续向上抛，由调用方决定退出或继续。
+        try:
+            session.save()
+        except Exception:
+            pass
+        raise

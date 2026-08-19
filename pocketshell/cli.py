@@ -321,7 +321,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"进入 REPL 模式（会话: {session.name}），输入 exit 退出，Ctrl+C 结束。")
             if prompt:
                 print(f"\n\033[90m> {prompt}\033[0m")
-                _run_turn(session, prompt, model, temperature, top_p, use_tools, max_tokens, show_usage)
+                try:
+                    _run_turn(session, prompt, model, temperature, top_p, use_tools, max_tokens, show_usage)
+                except KeyboardInterrupt:
+                    print("\n已取消本轮（上下文已保存，可继续提问）。")
                 print()
                 sys.stdout.write(_renderer.reset())
                 sys.stdout.flush()
@@ -359,7 +362,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                         print(f"已设置工作目录: {ws}")
                     print("（该目录内写文件免确认，删除仍硬拦；关闭窗口或 cd 离开后失效）")
                     continue
-                _run_turn(session, user_input, model, temperature, top_p, use_tools, max_tokens, show_usage)
+                try:
+                    _run_turn(session, user_input, model, temperature, top_p, use_tools, max_tokens, show_usage)
+                except KeyboardInterrupt:
+                    print()
+                    sys.stdout.write(_renderer.reset())
+                    print("已取消本轮（上下文已保存，可继续提问）。")
+                    continue
                 print()
                 sys.stdout.write(_renderer.reset())
                 sys.stdout.flush()
@@ -383,7 +392,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"\n\033[31m{e}\033[0m", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("\n已取消。")
+        # 单次对话模式：run_conversation 已把上下文落盘（见 api.py），提示用户不丢
+        print("\n已取消（上下文已保存，下次提问会延续）。")
         return 130
     except Exception as e:  # 兜底
         print(f"\n\033[31m意外错误: {type(e).__name__}: {e}\033[0m", file=sys.stderr)
