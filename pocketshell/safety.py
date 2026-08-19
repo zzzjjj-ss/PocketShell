@@ -109,6 +109,11 @@ WRITE_RULES: List[tuple] = [
     (r"New-Item\b|Copy-Item\b|Move-Item\b|Rename-Item\b", "写文件操作（创建/复制/移动/重命名）"),
     (r"\bcopy\b|\bxcopy\b|\brobocopy\b|\breplace\b", "写文件操作（复制文件）"),
     (r"\bmove\b|\bren(?:ame)?\b", "写文件操作（移动/重命名文件）"),
+    # 下载保存到本地（curl -o/-O、wget -O/-o、--output、PowerShell Invoke-WebRequest）
+    (r"\bcurl\b[^\n]*\s-(?:o|O)\b", "写文件操作（curl 下载保存）"),
+    (r"\bwget\b[^\n]*\s-(?:o|O)\b", "写文件操作（wget 下载保存）"),
+    (r"--output\b", "写文件操作（下载保存）"),
+    (r"\bInvoke-WebRequest\b[^\n]*-(?:OutFile|o)\b|\biwr\b[^\n]*-(?:OutFile|o)\b", "写文件操作（PowerShell 下载保存）"),
 ]
 
 

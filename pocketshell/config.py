@@ -73,6 +73,8 @@ DEFAULTS: Dict[str, str] = {
     # ---- 工具与交互 ----
     # 是否启用工具调用（execute_shell/remember/recall/web_search/fetch_url）
     "ENABLE_TOOLS": "true",
+    # 单次对话中工具调用轮数的硬上限（防止模型失败后无限重试/换姿势螺旋烧 token）
+    "MAX_TOOL_ROUNDS": "10",
     # 流式输出（"true"/"false"）
     "STREAM": "true",
     # 每轮对话后是否显示 token 消耗统计（含缓存命中）
@@ -269,6 +271,8 @@ _CONFIG_TEMPLATE = """{
   // ---------- 工具与交互 ----------
   // 是否启用工具调用（execute_shell/remember/recall/forget/update_memory/web_search/fetch_url）
   "ENABLE_TOOLS": true,
+  // 单次对话工具调用轮数硬上限（防模型失败后无限重试/换姿势螺旋烧 token；超出即停止并如实汇报）
+  "MAX_TOOL_ROUNDS": 10,
   // 流式输出
   "STREAM": true,
   // 每轮对话后显示 token 消耗统计（含缓存命中，省 token 看得见；命令行 --no-usage 可关）

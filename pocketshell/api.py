@@ -14,6 +14,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from http.client import IncompleteRead
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 from .config import cfg
@@ -135,7 +136,10 @@ def make_system_prompt() -> str:
 3. 需长期记住的信息（目录/设置/偏好）先 recall 查，没有则 remember 存；清除/变更用 forget/update_memory。
 4. 工具输出被截断时基于已有信息回答，不臆造缺失部分。
 5. 命令失败时先看错误输出判断原因（如程序不存在/路径不对/权限不足），换等价正确写法；不要反复盲试同一种失败命令，更不要换 shell 再试同一条命令。
-6. 遇到 Illegal byte sequence / Error opening input 且涉及中文文件名：这是 Windows 系统代码页(GBK)与程序 UTF-8 路径不兼容，与命令写法无关，重试无用。停止并告知用户两个解决办法：①开系统 UTF-8 Beta（控制面板→区域→更改系统区域设置→勾选 Beta UTF-8，重启）；②把文件重命名为英文再操作（需用户确认后执行 copy/rename）。
+6. 同一目标连续失败 2 次（搜索无结果/抓取失败/命令报错都算）必须停止该方向的尝试，换更可能成功的做法，或如实向用户汇报已尝试的内容与失败原因；严禁无限重试、换姿势硬试（每次失败都烧 token）。
+7. 写文件需用户确认：安全层返回"用户取消了该命令的执行"后立即停止，不要再用其它写法（重定向/echo >/curl -o/wget -O 等）反复尝试写文件——用户拒绝就是拒绝。
+8. 查看网页内容用 fetch_url 工具（自动提取正文），不要用 curl/wget 下载保存到本地文件再读——多此一举还会触发写文件确认。
+9. 遇到 Illegal byte sequence / Error opening input 且涉及中文文件名：这是 Windows 系统代码页(GBK)与程序 UTF-8 路径不兼容，与命令写法无关，重试无用。停止并告知用户两个解决办法：①开系统 UTF-8 Beta（控制面板→区域→更改系统区域设置→勾选 Beta UTF-8，重启）；②把文件重命名为英文再操作（需用户确认后执行 copy/rename）。
 
 【回答】简洁中文；代码/命令用 Markdown 代码块；不确定就说明，不编造。
 """
@@ -225,14 +229,30 @@ def stream_completion(
             resp.close()
             raise ApiError(f"API 返回错误 {status_code}: {body}", status_code=status_code)
 
+        emitted = [False]
+
+        def _wrap_chunk(chunk: str) -> None:
+            emitted[0] = True
+            if on_chunk:
+                on_chunk(chunk)
+
         try:
-            return _consume_stream(resp, on_chunk, on_usage)
+            return _consume_stream(resp, _wrap_chunk, on_usage)
         except StreamClosed:
             resp.close()
             raise
         except ApiError:
             resp.close()
             raise
+        except (OSError, IncompleteRead) as e:
+            # 连接中断（如 WinError 10054）：若已输出部分内容，重试会重复输出 → 直接报错；
+            # 尚未输出任何内容（如刚连上就断）→ 关闭连接并重试。
+            resp.close()
+            if emitted[0]:
+                raise ApiError(f"连接中断（{e}），已输出的内容可能不完整，请重试。")
+            last_error = ApiError(f"连接中断：{e}")
+            time.sleep(1 + attempt)
+            continue
     raise last_error or ApiError("请求失败（未知原因）")
 
 
@@ -367,8 +387,20 @@ def run_conversation(
     """
     messages = session.messages_for_api(force_system=force_system)
     final_content = ""
+    # 工具调用轮数硬上限：防止模型陷入"失败→换姿势重试"无限螺旋烧 token（可配置）
+    max_rounds = cfg.get_int("MAX_TOOL_ROUNDS", 10)
+    rounds = 0
 
     while True:
+        rounds += 1
+        if rounds > max_rounds:
+            final_content = (
+                f"已达到工具调用轮数上限（{max_rounds} 轮），已停止继续尝试。\n"
+                "请基于已获得的信息回答；如果仍需要，请用户补充说明或手动操作。"
+            )
+            session.add_assistant(final_content)
+            session.save()
+            return final_content
         # 本轮请求的构成拆分（提示词/上下文/新输入），附在 usage 回调里一并上报
         est = _estimate_split(messages)
 

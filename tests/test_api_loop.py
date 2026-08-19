@@ -582,3 +582,107 @@ def test_absolute_path_executed(tmp_session, monkeypatch):
     tool_msgs = [m for m in tmp_session.messages if m["role"] == "tool"]
     assert len(tool_msgs) == 1
     assert "禁止" not in tool_msgs[0]["content"]
+
+
+# ---------------- 工具轮数上限 & 连接中断重试 ----------------
+
+class _ResetResponse:
+    """迭代时抛 ConnectionResetError 的假响应（模拟 WinError 10054）。"""
+
+    def __init__(self):
+        self.status_code = 200
+
+    def iter_lines(self, decode_unicode=True):
+        raise ConnectionResetError(10054, "远程主机强迫关闭了一个现有的连接")
+
+    def close(self):
+        pass
+
+
+def test_tool_loop_round_limit(tmp_session, monkeypatch):
+    """工具调用轮数达到 MAX_TOOL_ROUNDS 上限即停止，返回说明文本，不再无限请求。"""
+    tool_args = json.dumps({"shell_command": "echo x"})
+
+    def fake_post(url, headers, payload, timeout):
+        fake_post.n += 1
+        return 200, FakeResponse(_sse(_tool_chunk(0, "execute_shell_command", tool_args, "call_%d" % fake_post.n)))
+    fake_post.n = 0
+
+    monkeypatch.setattr(api, "_post", fake_post)
+    monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
+    monkeypatch.setattr(api, "run_tool", lambda name, args: "mock 结果")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+    monkeypatch.setenv("PS_MAX_TOOL_ROUNDS", "3")
+
+    tmp_session.add_user("一直调用工具")
+    result = api.run_conversation(
+        tmp_session,
+        model="deepseek-v4-flash",
+        temperature=0.0,
+        top_p=1.0,
+        tools=[{"type": "function", "function": {"name": "execute_shell_command"}}],
+    )
+    assert "已达到工具调用轮数上限" in result
+    # 上限 3 轮：第 4 轮直接收尾，不再发请求
+    assert fake_post.n == 3
+    # 会话已保存收尾消息
+    assert tmp_session.messages[-1]["content"] == result
+
+
+def test_connection_reset_retried(monkeypatch):
+    """连接中断（ConnectionResetError）未输出内容时应自动重试并成功。"""
+    def fake_post(url, headers, payload, timeout):
+        if not fake_post.called:
+            fake_post.called = True
+            return 200, _ResetResponse()
+        return 200, FakeResponse(_sse(_content_chunk("重试成功。")))
+
+    fake_post.called = False
+    monkeypatch.setattr(api, "_post", fake_post)
+    monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+
+    content, tool_calls, reasoning = api.stream_completion(
+        model="deepseek-v4-flash",
+        messages=[{"role": "user", "content": "hi"}],
+        tools=None,
+        temperature=0.0,
+        top_p=1.0,
+    )
+    assert content == "重试成功。"
+    assert fake_post.called
+
+
+def test_connection_reset_after_output_raises(monkeypatch):
+    """已输出部分内容时连接中断不应静默重试（避免重复输出），应抛 ApiError。"""
+    class _PartialThenReset:
+        def __init__(self):
+            self.n = 0
+            self.status_code = 200
+
+        def iter_lines(self, decode_unicode=True):
+            self.n += 1
+            if self.n == 1:
+                for line in _sse(_content_chunk("部分", "tool_calls")):
+                    yield line
+            raise ConnectionResetError(10054, "reset")
+
+        def close(self):
+            pass
+
+    def fake_post(url, headers, payload, timeout):
+        return 200, _PartialThenReset()
+
+    monkeypatch.setattr(api, "_post", fake_post)
+    monkeypatch.setattr(api, "_url", lambda: "https://api.deepseek.com/chat/completions")
+    monkeypatch.setenv("PS_API_KEY", "test-key")
+
+    with pytest.raises(api.ApiError) as exc:
+        api.stream_completion(
+            model="deepseek-v4-flash",
+            messages=[{"role": "user", "content": "hi"}],
+            tools=None,
+            temperature=0.0,
+            top_p=1.0,
+        )
+    assert "连接中断" in str(exc.value)

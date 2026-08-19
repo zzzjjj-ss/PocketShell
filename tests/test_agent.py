@@ -99,6 +99,28 @@ def test_confirm_rules(cmd):
     assert result.verdict == safety.CONFIRM, f"{cmd!r} 应为 CONFIRM, 实际 {result.verdict}: {result.reason}"
 
 
+# ---------------- safety: 下载保存类写文件（WRITE_RULES） ----------------
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "curl -s -L https://example.com/page.html -o page.html",
+        "curl -O https://example.com/file.zip",
+        "curl --output data.json https://example.com/api",
+        "wget -O out.html https://example.com",
+        "wget -o log.txt https://example.com",
+        "Invoke-WebRequest -Uri https://example.com -OutFile page.html",
+        "iwr https://example.com -OutFile page.html",
+        "curl -s -L --max-time 30 https://liquipedia.net/x -o ewc.html",
+    ],
+)
+def test_download_write_rules(cmd):
+    """curl -o/-O、wget -O/-o、--output、Invoke-WebRequest -OutFile 都属于写文件，应 CONFIRM。"""
+    result = safety.analyze_command(cmd)
+    assert result.verdict == safety.CONFIRM, f"{cmd!r} 应为 CONFIRM, 实际 {result.verdict}: {result.reason}"
+    assert result.category == "write", f"{cmd!r} 应为 write 类, 实际 {result.category}"
+
+
 # ---------------- 嵌套命令递归分析 ----------------
 
 def test_nested_block():

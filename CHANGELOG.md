@@ -4,6 +4,20 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 修复
+
+- **工具循环硬上限(防烧 token 螺旋)**:单次对话工具调用轮数超过
+  `MAX_TOOL_ROUNDS`(默认 10,可配置)即停止并如实汇报,不再无限重试/换姿势硬试。
+- **连接中断自动重试**:API 流式连接被重置(`WinError 10054` 等,未输出任何内容时)
+  自动重试;已输出部分内容时明确报错提示重试,避免重复输出。
+- **下载写文件纳入确认**:`curl -o/-O`、`wget -O/-o`、`--output`、
+  `Invoke-WebRequest -OutFile` 等下载保存到本地文件的命令现在同样需要用户确认
+  (此前会绕过写文件检查,模型借 curl 把网页 HTML 直接写进用户目录)。
+- **提示词防螺旋规则**:同一目标连续失败 2 次必须停止换方向;写文件被用户拒绝后
+  不得换写法反复尝试;查看网页一律用 fetch_url 不要 curl 存本地。
+
 ## [0.2.2] - 2026-08-19
 
 ### 修复
