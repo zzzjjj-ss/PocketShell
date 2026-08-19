@@ -18,7 +18,7 @@ find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 rm -f "$ROOT/pocketshell.zip"
 zip -r "$ROOT/pocketshell.zip" \
     run.bat run.sh README.md README.en.md CHANGELOG.md LICENSE pyproject.toml pocketshell setup \
-    -x '*/__pycache__/*' '*.pyc' 'pocketshell/tests/*' > /dev/null
+    -x '*/__pycache__/*' '*.pyc' 'pocketshell/tests/*' 'pocketshell/config/*' '*.sgptrc' > /dev/null
 
 echo "[2/3] 下载/解压 Windows embeddable Python 3.13.15 ..."
 EMBED_VER=3.13.15
